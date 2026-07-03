@@ -200,18 +200,19 @@ async function doAction(r, kind) {
   const busy = kind === 'transcript' ? busyT : busyS;
   busy.add(r.ts); setBusyLabel(r.ts, kind === 'transcript' ? 'Transcrevendo…' : 'Resumindo…');
 
-  // precisa dos SEGMENTOS de áudio (uma reunião longa tem várias partes)
-  let segs = [];
-  try { segs = await mxIdbGetSegs(r.ts); } catch (e) { /* ignore */ }
-  if (!segs.length) {
+  // pega o ARQUIVO INTEIRO e fatia em partes SÓ para transcrever (o arquivo salvo fica intacto)
+  let blob = null;
+  try { blob = await mxIdbGet(r.ts); } catch (e) { /* ignore */ }
+  if (!blob) {
     busy.delete(r.ts); delete progLabel[r.ts];
     toast('Áudio não está mais salvo (guardamos as 12 gravações mais recentes).'); loadRecordings();
     return;
   }
+  const chunks = mxChunksFromBlob(blob, r.chunkBytes);
   const onProg = (d, t) => setBusyLabel(r.ts, d >= t ? 'Finalizando…' : ('Transcrevendo parte ' + (d + 1) + '/' + t + '…'));
 
   if (kind === 'transcript') {
-    const res = await mxTranscribeSegments(geminiKey, settings.geminiModel, settings.summaryLang, segs, onProg);
+    const res = await mxTranscribeSegments(geminiKey, settings.geminiModel, settings.summaryLang, chunks, onProg);
     busy.delete(r.ts); delete progLabel[r.ts];
     if (res.ok) { openT.add(r.ts); updateRec(r.ts, { transcript: res.text }); toast('Transcrição pronta ✓'); loadRecordings(); }
     else finishErr(r, 'transcript', res);
@@ -221,7 +222,7 @@ async function doAction(r, kind) {
   // resumo: sai do TEXTO da transcrição já juntada. Se ainda não há transcrição, transcreve antes.
   let transcript = r.transcript;
   if (!transcript) {
-    const tr = await mxTranscribeSegments(geminiKey, settings.geminiModel, settings.summaryLang, segs, onProg);
+    const tr = await mxTranscribeSegments(geminiKey, settings.geminiModel, settings.summaryLang, chunks, onProg);
     if (!tr.ok) { busy.delete(r.ts); delete progLabel[r.ts]; finishErr(r, 'summary', tr); return; }
     transcript = tr.text;
     updateRec(r.ts, { transcript }); // aproveita e guarda a transcrição

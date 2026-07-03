@@ -117,7 +117,22 @@ async function mxSummarizeTranscript(key, model, lang, transcript) {
   return mxGeminiCall(key, model, [{ text: prompt }]);
 }
 
+// fatia o arquivo ÚNICO em partes p/ transcrição, usando os offsets de byte (limites de
+// frame anotados na gravação). O arquivo salvo continua inteiro — isto só existe na hora de
+// mandar cada pedaço pro Gemini. Sem cortes (gravação curta) -> uma parte só (o arquivo todo).
+function mxChunksFromBlob(blob, cutBytes) {
+  const cuts = Array.isArray(cutBytes) ? cutBytes : [];
+  const chunks = [];
+  let prev = 0;
+  for (const c of cuts) {
+    if (c > prev && c < blob.size) { chunks.push(blob.slice(prev, c, 'audio/mpeg')); prev = c; }
+  }
+  chunks.push(blob.slice(prev, blob.size, 'audio/mpeg'));
+  return chunks;
+}
+
 if (typeof window !== 'undefined') {
   window.mxTranscribeSegments = mxTranscribeSegments;
   window.mxSummarizeTranscript = mxSummarizeTranscript;
+  window.mxChunksFromBlob = mxChunksFromBlob;
 }

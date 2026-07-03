@@ -1,16 +1,16 @@
 // Offscreen document: SÓ mídia. Captura o áudio do SISTEMA (getDisplayMedia) + microfone,
-// mixa, e CODIFICA MP3 EM TEMPO REAL (ScriptProcessor -> lamejs), bloco a bloco.
+// mixa, e CODIFICA MP3 EM TEMPO REAL (ScriptProcessor -> lamejs), bloco a bloco, num
+// ÚNICO encoder contínuo. O resultado é UM arquivo MP3 inteiro (o original), salvo uma vez.
 //
-// POR QUE assim: o caminho antigo (MediaRecorder -> webm inteiro -> decodeAudioData ->
-// OfflineAudioContext -> lamejs no fim) carregava a gravação INTEIRA em PCM na memória.
-// A partir de ~10 min isso estoura o processo (centenas de MB a GBs) e o Chrome MATA o
-// offscreen SEM exceção capturável -> a gravação sumia em silêncio. Codificando ao vivo,
-// a memória fica CONSTANTE (só o buffer do encoder), independente da duração.
+// POR QUE ao vivo: o caminho antigo (MediaRecorder -> webm inteiro -> decodeAudioData ->
+// OfflineAudioContext -> encode no fim) carregava a gravação INTEIRA em PCM. A partir de
+// ~10 min isso estourava a memória do renderer e o Chrome MATAVA o offscreen SEM exceção
+// -> a gravação sumia em silêncio. Codificando ao vivo, a memória fica ~constante.
 //
-// Streaming também dá de graça os SEGMENTOS: a cada ~N min o encoder rotaciona e vira um
-// MP3 independente, salvo já no IndexedDB (durável) e pronto para transcrever em partes.
-// O sampleRate:44100 no AudioContext só evita reamostrar na mão (o Chrome reamostra as
-// fontes 48k->44.1k sozinho); quem mata o OOM é o streaming, não a taxa.
+// A divisão em partes existe SÓ para a transcrição no Gemini: durante o encode eu apenas
+// ANOTO os offsets de byte (limites de frame) a cada ~N min em `cutBytes`. O arquivo salvo
+// NÃO é cortado — na hora de transcrever, fatia-se o blob por esses offsets. O sampleRate:44100
+// no AudioContext só evita reamostrar na mão; quem mata o OOM é o streaming, não a taxa.
 
 let ctx = null;
 let captureStream = null;
@@ -23,15 +23,15 @@ let bitrate = 96;
 let micUsed = false;
 let srcLabel = 'Sistema';
 
-let recTs = 0;            // id da gravação (chave dos segmentos no IDB)
+let recTs = 0;            // id da gravação (chave no IDB)
 let sampleRate = 44100;
-let samplesPerSegment = 0;
+let samplesPerChunk = 0; // tamanho da PARTE de transcrição (derivado do bitrate)
+let nextCutSamples = 0;
 
 let carry = new Float32Array(0); // sobra de PCM (<1152) entre callbacks
-let segBytes = [];               // Uint8Array[] do segmento atual
-let segmentBlobs = [];           // Blob[] de todos os segmentos (p/ montar o MP3 completo)
-let segIndex = 0;
-let samplesInSeg = 0;
+let mp3Bytes = [];               // Uint8Array[] — o ARQUIVO INTEIRO (um só)
+let byteLen = 0;                 // bytes acumulados (sempre em limite de frame)
+let cutBytes = [];               // offsets de byte onde cada parte de transcrição começa/termina
 let totalSamples = 0;
 let blocksProcessed = 0;         // watchdog: precisa avançar durante a gravação
 let watchdog = null;
@@ -47,7 +47,6 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
 });
 
 // O seletor de tela/aba abre AQUI no offscreen (getDisplayMedia), isolado do service worker.
-// Pegamos só o áudio (largamos o vídeo).
 async function getDisplay() {
   const st = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: true });
   st.getVideoTracks().forEach((t) => t.stop());
@@ -120,15 +119,16 @@ async function start(opts) {
     scriptNode.connect(sinkGain);
     sinkGain.connect(ctx.destination);
 
-    // 5) encoder + tamanho do segmento derivado do bitrate p/ cada parte ficar < ~11 MB
-    //    (folga sob o limite inline do Gemini). Fonte única de verdade: esta fórmula.
+    // 5) encoder ÚNICO + tamanho da PARTE de transcrição, derivado do bitrate p/ cada parte
+    //    ficar < ~11 MB (folga sob o limite inline do Gemini). Fonte única: esta fórmula.
     const TARGET_BYTES = 11 * 1024 * 1024;
-    const secPerSeg = Math.max(60, Math.floor((TARGET_BYTES * 8) / (bitrate * 1000)));
-    samplesPerSegment = secPerSeg * sampleRate;
+    const secPerChunk = Math.max(60, Math.floor((TARGET_BYTES * 8) / (bitrate * 1000)));
+    samplesPerChunk = secPerChunk * sampleRate;
+    nextCutSamples = samplesPerChunk;
 
     encoder = new lamejs.Mp3Encoder(1, sampleRate, bitrate);
     carry = new Float32Array(0);
-    segBytes = []; segmentBlobs = []; segIndex = 0; samplesInSeg = 0; totalSamples = 0; blocksProcessed = 0;
+    mp3Bytes = []; byteLen = 0; cutBytes = []; totalSamples = 0; blocksProcessed = 0;
     recTs = Date.now(); stopping = false;
 
     scriptNode.onaudioprocess = onAudio;
@@ -162,7 +162,7 @@ function onAudio(e) {
   const input = e.inputBuffer.getChannelData(0); // Float32 mono, já em sampleRate
   blocksProcessed++;
 
-  // junta a sobra anterior + o bloco atual e drena em fatias de 1152 (bounded: sobra < 1152)
+  // junta a sobra anterior + o bloco atual e drena em fatias de 1152 (sobra fica < 1152)
   let buf;
   if (carry.length) { buf = new Float32Array(carry.length + input.length); buf.set(carry, 0); buf.set(input, carry.length); }
   else buf = input;
@@ -170,29 +170,14 @@ function onAudio(e) {
   let off = 0;
   while (buf.length - off >= FRAME) {
     const mp3 = encoder.encodeBuffer(floatToInt16(buf.subarray(off, off + FRAME)));
-    if (mp3.length) segBytes.push(new Uint8Array(mp3));
-    off += FRAME; samplesInSeg += FRAME; totalSamples += FRAME;
+    if (mp3.length) { mp3Bytes.push(new Uint8Array(mp3)); byteLen += mp3.length; }
+    off += FRAME; totalSamples += FRAME;
   }
   carry = buf.subarray(off).slice(); // guarda a sobra (<1152), copiada
 
-  if (samplesInSeg >= samplesPerSegment) rotateSegment(false);
-}
-
-// fecha o segmento atual: flush do encoder, salva o blob no IDB, e (se não for o último)
-// cria um encoder novo. flush() garante que o segmento termina num limite de frame limpo.
-function rotateSegment(isFinal) {
-  const tail = encoder.flush();
-  if (tail.length) segBytes.push(new Uint8Array(tail));
-  const blob = new Blob(segBytes, { type: 'audio/mpeg' });
-  segmentBlobs.push(blob);
-  const idx = segIndex;
-  const p = mxIdbPutSeg(recTs, idx, blob).catch((err) => {
-    chrome.runtime.sendMessage({ type: 'OFFSCREEN_WARN', warn: 'não consegui guardar uma parte do áudio: ' + err.message }).catch(() => {});
-  });
-
-  segIndex++; segBytes = []; samplesInSeg = 0;
-  if (!isFinal) encoder = new lamejs.Mp3Encoder(1, sampleRate, bitrate);
-  return p; // p/ o stop() esperar o último segmento entrar no IDB antes do REC_DONE
+  // marca os CORTES de transcrição (só offsets de byte; o encoder NÃO é cortado -> arquivo
+  // continua inteiro). byteLen aqui está sempre num limite de frame (lamejs emite frames inteiros).
+  while (totalSamples >= nextCutSamples) { cutBytes.push(byteLen); nextCutSamples += samplesPerChunk; }
 }
 
 async function stop() {
@@ -202,14 +187,15 @@ async function stop() {
   try {
     if (!encoder) { chrome.runtime.sendMessage({ type: 'OFFSCREEN_ERROR', error: 'nada estava gravando.' }).catch(() => {}); cleanup(true); return; }
 
-    // encoda a sobra final (<1152) ANTES do flush p/ não perder os últimos ~26 ms
+    // encoda a sobra final (<1152) e dá flush no encoder (fecha o último frame) — sem perder o fim
     if (carry.length) {
       const mp3 = encoder.encodeBuffer(floatToInt16(carry));
-      if (mp3.length) segBytes.push(new Uint8Array(mp3));
+      if (mp3.length) { mp3Bytes.push(new Uint8Array(mp3)); byteLen += mp3.length; }
       totalSamples += carry.length;
       carry = new Float32Array(0);
     }
-    await rotateSegment(true); // fecha o último segmento e garante que ele entrou no IDB
+    const tail = encoder.flush();
+    if (tail.length) { mp3Bytes.push(new Uint8Array(tail)); byteLen += tail.length; }
 
     // solta o áudio
     try { if (scriptNode) scriptNode.onaudioprocess = null; } catch (e) { /* ignore */ }
@@ -217,19 +203,21 @@ async function stop() {
     try { if (micStream) micStream.getTracks().forEach((t) => t.stop()); } catch (e) { /* ignore */ }
     try { if (ctx && ctx.state !== 'closed') await ctx.close(); } catch (e) { /* ignore */ }
 
-    if (!segmentBlobs.length || !totalSamples) {
+    if (!mp3Bytes.length || !totalSamples) {
       chrome.runtime.sendMessage({ type: 'OFFSCREEN_ERROR', error: 'gravação vazia (nada foi capturado). Marque "Compartilhar áudio do sistema" ao escolher a tela, ou ligue o microfone.' }).catch(() => {});
       cleanup(true); return;
     }
 
+    // UM arquivo inteiro. cutBytes são só marcadores para fatiar na transcrição.
+    const full = new Blob(mp3Bytes, { type: 'audio/mpeg' });
     const durationSec = Math.round(totalSamples / sampleRate);
-    const full = new Blob(segmentBlobs, { type: 'audio/mpeg' });
     const sizeMB = +(full.size / (1024 * 1024)).toFixed(1);
-    const blobUrl = URL.createObjectURL(full); // válida p/ o chrome.downloads no service worker
+    await mxIdbPut(recTs, full); // salva o arquivo inteiro (aguarda entrar no IDB)
+    const blobUrl = URL.createObjectURL(full); // p/ o chrome.downloads no service worker
 
     chrome.runtime.sendMessage({
       type: 'REC_DONE', ts: recTs, sizeMB, durationSec, source: srcLabel, micUsed,
-      segCount: segmentBlobs.length, blobUrl
+      chunkBytes: cutBytes, blobUrl
     }).catch(() => {});
     setTimeout(() => { try { URL.revokeObjectURL(blobUrl); } catch (e) { /* ignore */ } }, 120000);
   } catch (e) {
@@ -246,6 +234,6 @@ function cleanup(keepStopping) {
   try { if (ctx && ctx.state !== 'closed') ctx.close(); } catch (e) { /* ignore */ }
   if (watchdog) { clearInterval(watchdog); watchdog = null; }
   scriptNode = null; sinkGain = null; captureStream = null; micStream = null; ctx = null; encoder = null;
-  carry = new Float32Array(0); segBytes = []; segmentBlobs = [];
+  carry = new Float32Array(0); mp3Bytes = []; cutBytes = [];
   if (!keepStopping) stopping = false;
 }

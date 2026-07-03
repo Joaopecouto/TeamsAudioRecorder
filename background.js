@@ -101,7 +101,7 @@ async function handleRecDone(m) {
   // salva metadados primeiro (mesmo se o download falhar, fica re-baixável na aba Gravações)
   const entry = {
     id: null, name: base, folder: sub, sizeMB: m.sizeMB, ts: m.ts,
-    durationSec: m.durationSec, source: m.source, mic: m.micUsed, segCount: m.segCount || 1, summary: '', transcript: ''
+    durationSec: m.durationSec, source: m.source, mic: m.micUsed, chunkBytes: m.chunkBytes || [], summary: '', transcript: ''
   };
   await new Promise((res) => chrome.storage.local.get({ recordings: [] }, (st) => {
     chrome.storage.local.set({ recordings: [entry, ...st.recordings].slice(0, 50) }, res);
@@ -129,9 +129,10 @@ async function handleRecDone(m) {
     if (local.geminiKey) {
       const keep = setInterval(() => { try { chrome.runtime.getPlatformInfo(() => void chrome.runtime.lastError); } catch (e) { /* ignore */ } }, 20000);
       try {
-        const segs = await mxIdbGetSegs(m.ts);
-        if (segs && segs.length) {
-          const tr = await mxTranscribeSegments(local.geminiKey, cfg.geminiModel, cfg.summaryLang, segs, null);
+        const blob = await mxIdbGet(m.ts);
+        if (blob) {
+          const chunks = mxChunksFromBlob(blob, m.chunkBytes);
+          const tr = await mxTranscribeSegments(local.geminiKey, cfg.geminiModel, cfg.summaryLang, chunks, null);
           if (tr.ok) {
             updateRec(m.ts, { transcript: tr.text });
             const sm = await mxSummarizeTranscript(local.geminiKey, cfg.geminiModel, cfg.summaryLang, tr.text);
