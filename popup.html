@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="pt-br">
+<head>
+  <meta charset="utf-8">
+  <style>
+    :root {
+      --teal: hsl(188 62% 38%); --teal-strong: hsl(190 64% 28%); --ink: hsl(190 24% 14%);
+      --muted: hsl(190 12% 42%); --surface: hsl(188 32% 99%); --surface-2: hsl(188 26% 95%);
+      --border: hsl(188 22% 86%); --rec: hsl(8 74% 52%); --rec-strong: hsl(8 70% 44%);
+    }
+    * { box-sizing: border-box; font-family: system-ui, -apple-system, "Segoe UI", sans-serif; }
+    body { width: 340px; margin: 0; background: var(--surface); color: var(--ink); }
+    .head { display: flex; align-items: center; justify-content: space-between; padding: 16px 16px 8px; }
+    .brand { display: flex; align-items: center; gap: 8px; font-weight: 700; font-size: 15px; }
+    .brand .ic { width: 24px; height: 24px; border-radius: 8px; background: var(--teal); display: flex; align-items: center; justify-content: center; }
+    .brand .ic i { width: 10px; height: 10px; border-radius: 50%; background: hsl(188 40% 97%); display: block; }
+    .gear { border: 0; background: transparent; color: var(--muted); cursor: pointer; width: 32px; height: 32px; border-radius: 8px; font-size: 18px; }
+    .gear:hover { background: var(--surface-2); color: var(--ink); }
+    .body { padding: 8px 16px 16px; }
+    .status { display: flex; align-items: center; gap: 10px; background: var(--surface-2); border-radius: 8px; padding: 16px; margin-bottom: 16px; }
+    .status .dot { width: 12px; height: 12px; border-radius: 50%; background: var(--muted); flex: none; }
+    .status.rec { background: hsl(8 80% 97%); }
+    .status.rec .dot { background: var(--rec); animation: pulse 1.4s ease-in-out infinite; }
+    .status.rec .txt { color: hsl(8 58% 38%); }
+    @keyframes pulse { 0%,100% { opacity: 1; transform: scale(1); } 50% { opacity: .35; transform: scale(.82); } }
+    .status .txt { font-size: 14px; }
+    .status .time { margin-left: auto; font-variant-numeric: tabular-nums; color: var(--muted); font-size: 14px; }
+    .big { width: 100%; min-height: 84px; border: 0; border-radius: 24px; background: var(--teal); color: hsl(188 40% 97%); cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 12px; font-size: 20px; font-weight: 400; padding: 24px; }
+    .big:hover { background: var(--teal-strong); }
+    .big .rdot { width: 16px; height: 16px; border-radius: 50%; background: hsl(188 40% 97%); flex: none; }
+    .big.rec { background: var(--rec); color: hsl(8 80% 97%); }
+    .big.rec:hover { background: var(--rec-strong); }
+    .big.rec .rdot { background: hsl(8 80% 97%); border-radius: 4px; }
+    .microw { display: flex; align-items: center; gap: 12px; padding: 16px; margin-top: 16px; background: var(--surface-2); border-radius: 8px; }
+    .microw .mlabel { display: flex; align-items: center; gap: 8px; font-size: 14px; }
+    .microw .mlabel svg { color: var(--teal); }
+    .switch { position: relative; width: 44px; height: 24px; flex: none; }
+    .switch input { opacity: 0; width: 0; height: 0; }
+    .switch .track { position: absolute; inset: 0; background: var(--border); border-radius: 24px; transition: .2s; cursor: pointer; }
+    .switch .track::before { content: ''; position: absolute; width: 18px; height: 18px; left: 3px; top: 3px; background: #fff; border-radius: 50%; transition: .2s; }
+    .switch input:checked + .track { background: var(--teal); }
+    .switch input:checked + .track::before { transform: translateX(20px); }
+    .micHint { font-size: 12px; color: var(--muted); margin-top: 8px; line-height: 1.5; }
+    .meta { display: flex; align-items: center; justify-content: space-between; margin-top: 16px; font-size: 12px; color: var(--muted); }
+    .meta a { color: var(--teal); text-decoration: none; cursor: pointer; }
+    .hint { font-size: 12px; color: var(--muted); margin-top: 8px; line-height: 1.5; }
+  </style>
+</head>
+<body>
+  <div class="head">
+    <div class="brand"><span class="ic"><i></i></span> Gravador de reunião</div>
+    <button class="gear" id="gear" title="Ajustes e gravações">&#9881;</button>
+  </div>
+  <div class="body">
+    <div class="status" id="status">
+      <span class="dot"></span>
+      <span class="txt" id="statusTxt">Pronto para gravar</span>
+      <span class="time" id="time"></span>
+    </div>
+    <button class="big" id="big"><span class="rdot"></span><span id="bigLabel">Iniciar gravação</span></button>
+    <div class="microw">
+      <span class="mlabel">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="2" width="6" height="11" rx="3"></rect><path d="M5 10a7 7 0 0 0 14 0"></path><line x1="12" y1="19" x2="12" y2="22"></line></svg>
+        Incluir meu microfone
+      </span>
+      <label class="switch" style="margin-left:auto"><input type="checkbox" id="micSwitch"><span class="track"></span></label>
+    </div>
+    <div class="micHint" id="micHint">Só a fonte principal será gravada.</div>
+    <div class="meta"><span id="dest">Salvar em: Downloads</span><a id="openRec">Ver gravações</a></div>
+    <div class="hint" id="hint">Abra o Teams ou o Meet nesta aba e clique em iniciar.</div>
+  </div>
+  <script src="popup.js"></script>
+</body>
+</html>

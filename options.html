@@ -1,0 +1,237 @@
+<!doctype html>
+<html lang="pt-br">
+<head>
+  <meta charset="utf-8">
+  <title>Gravador de reunião — ajustes e gravações</title>
+  <style>
+    :root {
+      --teal: hsl(188 62% 38%); --teal-strong: hsl(190 64% 28%); --ink: hsl(190 24% 14%);
+      --muted: hsl(190 12% 42%); --surface: hsl(188 32% 99%); --surface-2: hsl(188 26% 95%);
+      --border: hsl(188 22% 86%);
+    }
+    * { box-sizing: border-box; font-family: system-ui, -apple-system, "Segoe UI", sans-serif; }
+    body { margin: 0; background: var(--surface); color: var(--ink); padding: 48px 24px; }
+    .wrap { max-width: 640px; margin: 0 auto; }
+    .brand { display: flex; align-items: center; gap: 8px; margin-bottom: 24px; }
+    .brand .ic { width: 32px; height: 32px; border-radius: 8px; background: var(--teal); display: flex; align-items: center; justify-content: center; }
+    .brand .ic i { width: 13px; height: 13px; border-radius: 50%; background: hsl(188 40% 97%); display: block; }
+    h1 { font-size: 22px; font-weight: 700; margin: 0; }
+    .tabs { display: flex; gap: 8px; margin-bottom: 24px; border-bottom: 1px solid var(--border); }
+    .tab { padding: 12px 16px; font-size: 15px; color: var(--muted); cursor: pointer; border: 0; background: transparent; border-bottom: 2px solid transparent; margin-bottom: -1px; }
+    .tab.active { color: var(--ink); font-weight: 700; border-bottom-color: var(--teal); }
+    .pane.hidden { display: none; }
+
+    .card {
+      background: #fff; border: 1px solid var(--border); border-radius: 24px; padding: 32px; margin-bottom: 16px;
+      box-shadow: 0 413px 116px 0 rgba(10,39,41,0), 0 264px 106px 0 rgba(10,39,41,0.01),
+                  0 149px 89px 0 rgba(10,39,41,0.02), 0 66px 66px 0 rgba(10,39,41,0.03),
+                  0 17px 36px 0 rgba(10,39,41,0.04);
+    }
+    .sec { display: flex; align-items: center; gap: 10px; font-size: 17px; font-weight: 700; color: var(--ink); margin: 0 0 8px; }
+    .sec::before { content: ''; width: 10px; height: 10px; border-radius: 50%; background: var(--teal); flex: none; }
+    .sec small { font-weight: 400; font-size: 13px; color: var(--muted); }
+    .secsub { font-size: 13px; color: var(--muted); margin: 0 0 16px; line-height: 1.5; }
+
+    .row { padding: 16px 0; border-bottom: 1px solid var(--border); }
+    .row:last-child { border-bottom: 0; padding-bottom: 0; }
+    .row h3 { font-size: 14px; font-weight: 700; margin: 0 0 8px; }
+    .row p { font-size: 12px; color: var(--muted); margin: 0 0 12px; line-height: 1.5; }
+    .row.toggle { display: flex; align-items: flex-start; justify-content: space-between; gap: 24px; }
+    .row.toggle > div { flex: 1; }
+    a { color: var(--teal); cursor: pointer; text-decoration: none; }
+    input[type=text], input[type=password], select { width: 100%; padding: 12px; border: 1px solid var(--border); border-radius: 8px; font-size: 14px; color: var(--ink); background: var(--surface); }
+    input.highlight { outline: 2px solid var(--teal); outline-offset: 2px; }
+    .seg { display: flex; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
+    .seg-btn { flex: 1; border: 0; background: #fff; color: var(--muted); padding: 12px; font-size: 14px; cursor: pointer; }
+    .seg-btn.active { background: var(--teal); color: hsl(188 40% 97%); }
+    .chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+    .chip { border: 1px solid var(--border); background: #fff; color: var(--muted); border-radius: 24px; padding: 8px 16px; font-size: 12px; cursor: pointer; }
+    .chip:hover { border-color: var(--teal); color: var(--teal); }
+    .preview { margin-top: 8px; background: var(--surface-2); border-radius: 8px; padding: 12px; font-size: 13px; color: var(--ink); font-family: ui-monospace, Consolas, monospace; word-break: break-all; }
+    .preview b { color: var(--teal-strong); font-weight: 700; }
+    .sub { display: block; margin-top: 8px; }
+    .switch { position: relative; width: 44px; height: 24px; flex: none; }
+    .switch input { opacity: 0; width: 0; height: 0; }
+    .switch .track { position: absolute; inset: 0; background: var(--border); border-radius: 24px; transition: .2s; cursor: pointer; }
+    .switch .track::before { content: ''; position: absolute; width: 18px; height: 18px; left: 3px; top: 3px; background: #fff; border-radius: 50%; transition: .2s; }
+    .switch input:checked + .track { background: var(--teal); }
+    .switch input:checked + .track::before { transform: translateX(20px); }
+    .check { display: flex; align-items: center; gap: 16px; margin-top: 12px; }
+    .check span { font-size: 14px; }
+
+    .banner { background: hsl(188 40% 96%); border: 1px solid hsl(188 36% 84%); border-radius: 24px; padding: 20px 24px; margin-bottom: 16px; display: flex; align-items: center; gap: 16px; }
+    .banner.hidden { display: none; }
+    .banner .btxt { flex: 1; font-size: 13px; color: var(--ink); line-height: 1.6; }
+    .banner .btxt b { font-weight: 700; }
+    .banner .act { border: 0; background: var(--teal); color: hsl(188 40% 97%); border-radius: 8px; padding: 12px 16px; font-size: 14px; cursor: pointer; white-space: nowrap; }
+
+    .rechead { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
+    .rechead h3 { font-size: 16px; font-weight: 700; margin: 0; }
+    .recitem { padding: 16px; border: 1px solid var(--border); border-radius: 8px; margin-bottom: 12px; }
+    .recline { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+    .recname { font-size: 14px; color: var(--ink); word-break: break-all; }
+    .recmeta { font-size: 12px; color: var(--muted); margin-top: 4px; }
+    .recbtns { margin-left: auto; display: flex; gap: 8px; flex-wrap: wrap; }
+    .b { border: 1px solid var(--border); background: #fff; color: var(--teal); border-radius: 8px; padding: 8px 14px; font-size: 13px; cursor: pointer; }
+    .b:disabled { opacity: .45; cursor: default; color: var(--muted); }
+    .b.fill { background: var(--teal); color: hsl(188 40% 97%); border-color: var(--teal); }
+    .panel { margin-top: 12px; }
+    .panel .txt { background: var(--surface-2); border-radius: 8px; padding: 16px; font-size: 13px; white-space: pre-wrap; color: var(--ink); max-height: 320px; overflow: auto; line-height: 1.6; }
+    .panel .acts { display: flex; gap: 8px; margin-top: 8px; }
+    .empty { font-size: 14px; color: var(--muted); text-align: center; padding: 48px 0; }
+
+    .saved { position: fixed; left: 50%; bottom: 24px; transform: translate(-50%, 16px); background: var(--teal); color: hsl(188 40% 97%); padding: 12px 24px; border-radius: 24px; font-size: 14px; opacity: 0; pointer-events: none; transition: .25s ease; max-width: 80%; text-align: center; }
+    .saved.show { opacity: 1; transform: translate(-50%, 0); }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="brand"><span class="ic"><i></i></span><h1>Gravador de reunião</h1></div>
+    <div class="tabs">
+      <button class="tab active" data-tab="cap">Ajustes</button>
+      <button class="tab" data-tab="rec">Gravações</button>
+    </div>
+
+    <!-- AJUSTES -->
+    <div class="pane" id="pane-cap">
+
+      <div class="banner hidden" id="setupBanner">
+        <div class="btxt"><b>Bem-vindo!</b> Para gravar a reunião com a sua voz, autorize o microfone agora. Depois, cole a chave do Gemini abaixo para transcrever e resumir.</div>
+        <button class="act" id="grantMic">Permitir microfone</button>
+      </div>
+
+      <section class="card">
+        <h2 class="sec">Captura</h2>
+        <p class="secsub">Grava o áudio do SISTEMA (qualquer app). Ao iniciar, escolha a tela ou aba no seletor do Chrome e marque "Compartilhar áudio".</p>
+        <div class="row toggle">
+          <div><h3>Incluir meu microfone</h3><p>Mixa sua voz junto com a reunião. Use fones para evitar eco.</p></div>
+          <label class="switch"><input type="checkbox" id="micSwitch"><span class="track"></span></label>
+        </div>
+        <div class="row">
+          <h3>Aparelho do microfone</h3>
+          <select id="micDevice"><option value="">Microfone padrão do sistema</option></select>
+          <p id="micNote" class="sub">Autorize o microfone para ver os nomes dos aparelhos.</p>
+        </div>
+        <div class="row">
+          <h3>Volume do microfone</h3>
+          <p>O microfone costuma sair mais baixo que o áudio da reunião — aumente se a sua voz ficar fraca.</p>
+          <select id="micGain">
+            <option value="1">Normal (1×)</option>
+            <option value="2">Alto (2×)</option>
+            <option value="3">Muito alto (3×)</option>
+          </select>
+        </div>
+      </section>
+
+      <section class="card">
+        <h2 class="sec">Resumo com IA <small>(Gemini)</small></h2>
+        <p class="secsub">Transcrição e resumo das reuniões usando a sua chave gratuita do Gemini.</p>
+        <div class="row">
+          <h3>Chave do Gemini</h3>
+          <p>Fica só nesta máquina. <a id="getkey">Pegar chave grátis no Google AI Studio</a></p>
+          <input type="password" id="geminiKey" placeholder="AIza... (sua chave do Gemini)" autocomplete="off" spellcheck="false">
+          <select id="geminiModel" class="sub">
+            <option value="gemini-2.5-flash">gemini-2.5-flash (recomendado)</option>
+            <option value="gemini-2.0-flash">gemini-2.0-flash</option>
+          </select>
+        </div>
+        <div class="row">
+          <h3>Idioma do resumo e das tarefas</h3>
+          <p>Muda o texto enviado ao Gemini.</p>
+          <select id="summaryLang">
+            <option value="auto">Idioma natural da reunião</option>
+            <option value="pt">Sempre em português</option>
+          </select>
+        </div>
+        <div class="row toggle">
+          <div><h3>Resumo automático ao parar</h3><p>Desligado: o resumo só sai quando você clicar em "Criar resumo" na aba Gravações.</p></div>
+          <label class="switch"><input type="checkbox" id="autoSummary"><span class="track"></span></label>
+        </div>
+      </section>
+
+      <section class="card">
+        <h2 class="sec">Arquivo</h2>
+        <p class="secsub">Qualidade, nome e onde o MP3 é salvo.</p>
+        <div class="row">
+          <h3>Qualidade do MP3</h3>
+          <p>Mono · 44,1 kHz. Bitrate maior = som melhor e arquivo maior. (Para resumir reuniões longas no Gemini, prefira a econômica — o resumo tem limite de tamanho.)</p>
+          <select id="bitrate">
+            <option value="48">Econômica — 48 kbps (~21 MB/h)</option>
+            <option value="96">Boa — 96 kbps (~43 MB/h)</option>
+            <option value="128">Alta — 128 kbps (~57 MB/h)</option>
+          </select>
+        </div>
+        <div class="row">
+          <h3>Nome do arquivo</h3>
+          <p>Prefixo + data. Tokens: <b>AAAA</b> ano · <b>MM</b> mês · <b>DD</b> dia · <b>hh</b> hora · <b>mm</b> min · <b>ss</b> seg.</p>
+          <input type="text" id="filenamePrefix" placeholder="reuniao" style="margin-bottom:8px">
+          <input type="text" id="dateFormat" placeholder="AAAAMMDD-hhmm">
+          <div class="chips">
+            <button class="chip" data-fmt="AAAAMMDD-hhmm">AAAAMMDD-hhmm</button>
+            <button class="chip" data-fmt="DD-MM-AAAA_hhmm">DD-MM-AAAA_hhmm</button>
+            <button class="chip" data-fmt="AAAA-MM-DD_hhhmm">AAAA-MM-DD_hhhmm</button>
+          </div>
+          <div class="preview">Prévia: <b id="fmtPreview">reuniao-AAAAMMDD-hhmm.mp3</b></div>
+        </div>
+        <div class="row">
+          <h3>Pasta de destino</h3>
+          <p>Subpasta dentro de Downloads. Para escolher qualquer pasta, ligue "Perguntar onde salvar".</p>
+          <input type="text" id="subfolder" placeholder="Reuniões">
+        </div>
+        <div class="row toggle">
+          <div><h3>Perguntar onde salvar</h3><p>Abre "Salvar como" a cada gravação.</p></div>
+          <label class="switch"><input type="checkbox" id="askWhereToSave"><span class="track"></span></label>
+        </div>
+      </section>
+
+      <section class="card">
+        <h2 class="sec">Lembrete na reunião</h2>
+        <p class="secsub">O aviso flutuante que aparece no Teams/Meet.</p>
+        <div class="row toggle">
+          <div><h3>Mostrar lembrete</h3><p>Pill no canto ao entrar numa reunião.</p></div>
+          <label class="switch"><input type="checkbox" id="showPill"><span class="track"></span></label>
+        </div>
+        <div class="row toggle">
+          <div><h3>Aviso sonoro</h3><p>Toca um som curto e dá uma piscada quando o lembrete aparece.</p></div>
+          <label class="switch"><input type="checkbox" id="pillSound"><span class="track"></span></label>
+        </div>
+        <div class="row">
+          <h3>Canto do lembrete</h3>
+          <select id="pillCorner">
+            <option value="bottom-right">Inferior direito</option>
+            <option value="bottom-left">Inferior esquerdo</option>
+            <option value="top-right">Superior direito</option>
+            <option value="top-left">Superior esquerdo</option>
+          </select>
+        </div>
+        <div class="row">
+          <h3>Onde mostrar</h3>
+          <div class="check"><label class="switch"><input type="checkbox" id="domTeams"><span class="track"></span></label><span>Microsoft Teams</span></div>
+          <div class="check"><label class="switch"><input type="checkbox" id="domMeet"><span class="track"></span></label><span>Google Meet</span></div>
+        </div>
+      </section>
+    </div>
+
+    <!-- GRAVAÇÕES -->
+    <div class="pane hidden" id="pane-rec">
+      <div class="banner hidden" id="noKeyHint">
+        <div class="btxt">Configure a <b>chave do Gemini</b> em Ajustes para transcrever e resumir as gravações.</div>
+        <button class="act" id="goToKey">Configurar</button>
+      </div>
+      <section class="card">
+        <div class="rechead">
+          <h3>Suas gravações</h3>
+          <a id="clearRecs">Limpar histórico</a>
+        </div>
+        <div id="recList"><div class="empty">Nenhuma gravação ainda.</div></div>
+      </section>
+    </div>
+  </div>
+
+  <div class="saved" id="saved">Salvo ✓</div>
+  <script src="format.js"></script>
+  <script src="gemini.js"></script>
+  <script src="idb.js"></script>
+  <script src="options.js"></script>
+</body>
+</html>
