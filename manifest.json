@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Gravador de Reunião → MP3",
-  "version": "0.9.11",
+  "version": "0.9.12",
   "description": "Grava o áudio do sistema (qualquer app) + microfone e exporta um MP3 para resumir no Gemini. Lembrete flutuante no Meet/Teams.",
   "permissions": ["tabCapture", "desktopCapture", "offscreen", "downloads", "downloads.open", "storage", "unlimitedStorage", "activeTab", "tabs"],
   "host_permissions": [

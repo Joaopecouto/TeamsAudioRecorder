@@ -132,6 +132,15 @@ function updateRec(ts, patch) {
 }
 async function refreshAvail() { try { availTs = new Set(await mxIdbKeys()); } catch (e) { availTs = new Set(); } }
 function loadRecordings() { refreshAvail().then(() => chrome.storage.local.get({ recordings: [] }, ({ recordings }) => render(recordings))); }
+async function deleteRec(ts, name) {
+  if (!confirm('Excluir "' + (name || 'esta gravação') + '"?\nApaga o áudio, a transcrição e o resumo. Não dá pra desfazer.')) return;
+  const st = await new Promise((res) => chrome.storage.local.get({ recordings: [] }, res));
+  await new Promise((res) => chrome.storage.local.set({ recordings: st.recordings.filter((r) => r.ts !== ts) }, res));
+  try { await mxIdbDelete(ts); } catch (e) { /* ignore */ }
+  if (detailTs === ts) { detailTs = null; setWide(false); clearAudio(); }
+  loadRecordings();
+  toast('Gravação excluída');
+}
 
 let detailTs = null; // ts da gravação aberta em detalhe; null = mostrando a lista
 function setWide(on) { const w = document.querySelector('.wrap'); if (w) w.classList.toggle('wide', !!on); }
@@ -155,7 +164,7 @@ function renderList(list) {
   const c = $('recList'); c.innerHTML = '';
   if (!list.length) { c.innerHTML = '<div class="empty">Nenhuma gravação ainda.</div>'; return; }
   list.forEach((r) => {
-    const card = document.createElement('button'); card.className = 'reccard';
+    const card = document.createElement('div'); card.className = 'reccard'; card.setAttribute('role', 'button'); card.tabIndex = 0;
     const info = document.createElement('div'); info.className = 'recinfo';
     info.innerHTML = '<div class="recname">' + esc(r.name) + '</div><div class="recmeta">' +
       whenStr(r.ts) + ' · ' + mmss(r.durationSec) + ' · ' + r.sizeMB + ' MB · ' + esc(r.source) + (r.mic ? ' + mic' : '') + '</div>';
@@ -165,9 +174,14 @@ function renderList(list) {
       if (r.transcript) { const t = document.createElement('span'); t.className = 'tag on'; t.textContent = 'Transcrita'; st.appendChild(t); }
       if (r.summary) { const t = document.createElement('span'); t.className = 'tag on'; t.textContent = 'Resumo'; st.appendChild(t); }
     }
+    const del = document.createElement('button'); del.className = 'recdel'; del.title = 'Excluir gravação';
+    del.innerHTML = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>';
+    del.addEventListener('click', (e) => { e.stopPropagation(); deleteRec(r.ts, r.name); });
+    st.appendChild(del);
     const ch = document.createElement('span'); ch.className = 'chev'; ch.textContent = '›'; st.appendChild(ch);
     card.appendChild(info); card.appendChild(st);
     card.addEventListener('click', () => openDetail(r.ts));
+    card.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openDetail(r.ts); } });
     c.appendChild(card);
   });
 }
@@ -219,7 +233,8 @@ function detHeader(r) {
       chrome.downloads.download({ url: u, filename: (r.folder ? r.folder + '/' : '') + r.name, saveAs: false });
     } catch (e) { toast('Erro ao baixar: ' + e.message); }
   });
-  acts.appendChild(open); acts.appendChild(show); acts.appendChild(dl);
+  const del = mkBtn('Excluir'); del.classList.add('danger'); del.addEventListener('click', () => deleteRec(r.ts, r.name));
+  acts.appendChild(open); acts.appendChild(show); acts.appendChild(dl); acts.appendChild(del);
   row.appendChild(acts);
   head.appendChild(row);
   return head;
