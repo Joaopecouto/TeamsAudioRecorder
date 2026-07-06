@@ -132,8 +132,7 @@ async function handleRecDone(m) {
         const blob = await mxIdbGet(m.ts);
         if (blob) {
           const chunks = mxChunksFromBlob(blob, m.chunkBytes);
-          const starts = [0].concat(m.chunkSecs || []);
-          const tr = await mxTranscribeSegments(local.geminiKey, cfg.geminiModel, cfg.summaryLang, chunks, null, starts);
+          const tr = await mxTranscribeSegments(local.geminiKey, cfg.geminiModel, cfg.summaryLang, chunks, null);
           if (tr.ok) {
             updateRec(m.ts, { transcript: tr.text });
             const sm = await mxSummarizeTranscript(local.geminiKey, cfg.geminiModel, cfg.summaryLang, tr.text);

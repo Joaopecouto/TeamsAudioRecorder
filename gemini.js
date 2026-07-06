@@ -1,6 +1,6 @@
 // Chamadas à API oficial do Gemini + prompts. Compartilhado entre a página (options) e o
-// service worker (importScripts). Fluxo novo p/ reuniões longas:
-//   1) transcreve CADA segmento de áudio (< ~14 MB) separadamente (inline base64);
+// service worker (importScripts). Fluxo p/ reuniões longas:
+//   1) transcreve CADA parte de áudio (< ~14 MB) separadamente (inline base64);
 //   2) junta as transcrições em ordem;
 //   3) o RESUMO sai desse TEXTO junto (chamada de texto puro, sem limite de áudio).
 const MX_INLINE_MAX = 14 * 1024 * 1024; // teto seguro por parte enviada inline
@@ -20,27 +20,11 @@ async function mxBlobToBase64(blob) {
 }
 
 // ----- prompts -----
-function mxTranscriptPrompt(lang, speakerCount) {
+function mxTranscriptPrompt(lang) {
   const out = (lang === 'pt')
-    ? 'Escreva as falas em português (traduza se estiverem em outro idioma).'
-    : 'Escreva no idioma falado, sem traduzir.';
-  const n = parseInt(speakerCount, 10);
-  // saber o nº de vozes melhora MUITO a separação. Frase "chunk-safe": dá o total sem forçar
-  // que TODAS apareçam neste trecho (evita inventar um locutor onde só há dois).
-  const hint = (n && n > 0)
-    ? `CONTEXTO: a reunião inteira tem ${n} ${n === 1 ? 'pessoa distinta' : 'pessoas distintas'} (Locutor 1${n > 1 ? ' a Locutor ' + n : ''}). Separe as vozes com cuidado — NÃO junte duas pessoas no mesmo locutor. (Este trecho pode não conter todas as ${n}.) `
-    : '';
-  return `Atue como um analista de áudio especializado em DIARIZAÇÃO de locutores. ${hint}Transcreva o áudio identificando com precisão CADA pessoa diferente que fala, separando o texto por locutor. ${out}
-
-Regras:
-- Micro-falas: NUNCA ignore interrupções, falas curtas ou frases isoladas — inclusive nos segundos FINAIS. Processe o fim do áudio com a mesma atenção do início.
-- Contraste acústico: quando o TIMBRE da voz mudar claramente, trate como um NOVO locutor. Na dúvida real entre uma voz e outra, prefira SEPARAR.
-- Sem exagero: a MESMA pessoa mudando de tom/ritmo/emoção continua sendo o MESMO locutor. Só crie um novo locutor para uma VOZ realmente diferente.
-- Nomeie sequencialmente: "Locutor 1", "Locutor 2", "Locutor 3"… e use o MESMO número para a mesma voz. NÃO invente nomes próprios.
-- Transcreva tudo, sem resumir e sem comentários seus. Este áudio pode ser uma PARTE de uma reunião maior; transcreva só o que ouvir.
-
-Em cada fala inclua também "inicio" = tempo APROXIMADO de início, em SEGUNDOS desde o começo DESTE áudio (número inteiro).
-Retorne EXCLUSIVAMENTE um JSON válido: {"transcricao":[{"inicio":0,"locutor":"Locutor 1","fala":"..."},{"inicio":8,"locutor":"Locutor 2","fala":"..."}]}. Nada antes ou depois do JSON.`;
+    ? 'Entregue a transcrição em português (traduza se a fala estiver em outro idioma).'
+    : 'Transcreva no idioma falado, sem traduzir.';
+  return `Transcreva o ÁUDIO desta reunião o mais fiel possível. Identifique mudanças de interlocutor como "Pessoa 1:", "Pessoa 2:" quando der para distinguir. ${out} Não resuma — transcreva tudo o que foi dito.`;
 }
 function mxSummaryPromptText(lang) {
   const out = (lang === 'pt')
@@ -61,59 +45,6 @@ function mxSummaryPromptText(lang) {
 ## Próximos passos
 
 Regras: não invente nada que não esteja na transcrição; se responsável/prazo não foi dito, escreva "—".`;
-}
-
-// Diarização: pedimos ao Gemini um JSON {transcricao:[{locutor,fala}]} e convertemos para o
-// texto "Locutor N: fala" que o resto do app já entende (chat, nomeação, resumo).
-const MX_DIAR_SCHEMA = {
-  type: 'object',
-  properties: {
-    transcricao: {
-      type: 'array',
-      items: { type: 'object', properties: { inicio: { type: 'number' }, locutor: { type: 'string' }, fala: { type: 'string' } }, required: ['locutor', 'fala'] }
-    }
-  },
-  required: ['transcricao']
-};
-function mxSecToLabel(s) {
-  s = Math.max(0, Math.round(s || 0));
-  return String(Math.floor(s / 60)).padStart(2, '0') + ':' + String(s % 60).padStart(2, '0');
-}
-function mxParseSec(v) {
-  if (typeof v === 'number' && isFinite(v)) return v;
-  const s = String(v == null ? '' : v).trim();
-  const m = s.match(/^(\d+):(\d{1,2})$/);
-  if (m) return parseInt(m[1], 10) * 60 + parseInt(m[2], 10);
-  const n = parseFloat(s);
-  return isFinite(n) ? n : null;
-}
-// tenta JSON.parse; se veio truncado (finishReason MAX_TOKENS), fecha no último objeto completo
-function mxParseLoose(raw) {
-  try { return JSON.parse(raw); } catch (e) { /* segue p/ salvamento */ }
-  const s = String(raw || '');
-  const last = s.lastIndexOf('}');
-  if (last > 0) {
-    let cut = s.slice(0, last + 1);
-    if (!/\]\s*\}\s*$/.test(cut)) cut += ']}';
-    try { return JSON.parse(cut); } catch (e) { /* desiste */ }
-  }
-  return null;
-}
-// JSON do Gemini -> "[MM:SS] Locutor N: fala" (o timestamp leva o offset de início da parte)
-function mxJsonToTranscript(raw, offsetSec) {
-  offsetSec = offsetSec || 0;
-  const data = mxParseLoose(raw);
-  if (!data) return String(raw || '').trim(); // não era JSON -> usa cru
-  const arr = (data.transcricao || data.transcription || data.turns) || (Array.isArray(data) ? data : []);
-  if (!Array.isArray(arr) || !arr.length) return String(raw || '').trim();
-  return arr.map((t) => {
-    const sp = String((t && (t.locutor || t.speaker || t.pessoa)) || 'Locutor 1').trim();
-    const fala = String((t && (t.fala || t.text || t.texto)) || '').trim();
-    if (!fala) return '';
-    const sec = mxParseSec(t && (t.inicio != null ? t.inicio : (t.start != null ? t.start : (t.tempo != null ? t.tempo : t.timestamp))));
-    const stamp = (sec != null) ? ('[' + mxSecToLabel(sec + offsetSec) + '] ') : '';
-    return stamp + sp + ': ' + fala;
-  }).filter(Boolean).join('\n\n');
 }
 
 // ----- chamada base -----
@@ -150,7 +81,7 @@ async function mxGeminiAudio(key, model, prompt, blob, genConfig) {
   return mxGeminiCall(key, model, [{ text: prompt }, { inline_data: { mime_type: 'audio/mpeg', data: b64 } }], genConfig);
 }
 
-// mesma coisa, mas com backoff em 429/5xx (rate limit por minuto)
+// mesma coisa, mas com backoff em 429/5xx (rate limit por minuto / sobrecarga temporária)
 async function mxGeminiAudioBackoff(key, model, prompt, blob, attempt, genConfig) {
   attempt = attempt || 0;
   const r = await mxGeminiAudio(key, model, prompt, blob, genConfig);
@@ -162,21 +93,21 @@ async function mxGeminiAudioBackoff(key, model, prompt, blob, attempt, genConfig
   return r;
 }
 
-// transcreve TODOS os segmentos em sequência (espaçados) e junta os textos.
+// transcreve TODAS as partes em sequência (espaçadas) e junta os textos.
 // onProgress(feito, total) atualiza a UI. Retorna { ok, text } ou { ok:false, error, partial }.
-async function mxTranscribeSegments(key, model, lang, blobs, onProgress, startSecs, speakerCount) {
+async function mxTranscribeSegments(key, model, lang, blobs, onProgress) {
   if (!key) return { ok: false, error: 'Sem chave do Gemini (Ajustes → Resumo com IA).' };
   if (!blobs || !blobs.length) return { ok: false, error: 'sem áudio para transcrever.' };
-  const prompt = mxTranscriptPrompt(lang, speakerCount);
+  const prompt = mxTranscriptPrompt(lang);
   // temperature 0 = transcrição fiel/estável. thinkingBudget 0 = SEM "pensar" (o 2.5-flash
   // gasta tokens de saída pensando, o que truncava a transcrição); transcrever não precisa disso.
-  const genConfig = { responseMimeType: 'application/json', responseSchema: MX_DIAR_SCHEMA, temperature: 0, maxOutputTokens: 8192, thinkingConfig: { thinkingBudget: 0 } };
+  const genConfig = { temperature: 0, maxOutputTokens: 8192, thinkingConfig: { thinkingBudget: 0 } };
   const parts = [];
   for (let i = 0; i < blobs.length; i++) {
     if (onProgress) onProgress(i, blobs.length);
     const r = await mxGeminiAudioBackoff(key, model, prompt, blobs[i], 0, genConfig);
     if (!r.ok) return { ok: false, error: 'parte ' + (i + 1) + '/' + blobs.length + ': ' + r.error, partial: parts.join('\n\n') };
-    parts.push(mxJsonToTranscript(r.text, (startSecs && startSecs[i]) || 0));
+    parts.push(r.text);
     if (i < blobs.length - 1) await mxSleep(MX_SPACING_MS);
   }
   if (onProgress) onProgress(blobs.length, blobs.length);
