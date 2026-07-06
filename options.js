@@ -194,17 +194,18 @@ function getAudio(r) {
 }
 function clearAudio() { if (audioUrl) { try { URL.revokeObjectURL(audioUrl); } catch (e) { /* ignore */ } } audioTs = null; audioEl = null; audioUrl = null; }
 
-// ---- painel esquerdo: player de áudio + ações do arquivo ----
-function detLeft(r) {
-  const left = document.createElement('div'); left.className = 'detleft';
+// ---- cabeçalho (largura total): nome/meta + player de áudio + ações ----
+function detHeader(r) {
+  const head = document.createElement('div'); head.className = 'dethead2';
 
-  const head = document.createElement('div'); head.className = 'dethead';
-  head.innerHTML = '<div class="detname">' + esc(r.name) + '</div><div class="detmeta">' +
+  const info = document.createElement('div'); info.className = 'dinfo';
+  info.innerHTML = '<div class="detname">' + esc(r.name) + '</div><div class="detmeta">' +
     whenStr(r.ts) + ' · ' + mmss(r.durationSec) + ' · ' + r.sizeMB + ' MB · ' + esc(r.source) + (r.mic ? ' + microfone' : '') + '</div>';
-  left.appendChild(head);
+  head.appendChild(info);
 
-  if (availTs.has(r.ts)) left.appendChild(getAudio(r));
-  else { const d = document.createElement('div'); d.className = 'dempty'; d.textContent = 'Áudio não está mais salvo (guardamos as 12 gravações mais recentes).'; left.appendChild(d); }
+  const row = document.createElement('div'); row.className = 'dplayer';
+  if (availTs.has(r.ts)) row.appendChild(getAudio(r));
+  else { const d = document.createElement('div'); d.className = 'dempty'; d.textContent = 'Áudio não está mais salvo (guardamos as 12 gravações mais recentes).'; row.appendChild(d); }
 
   const acts = document.createElement('div'); acts.className = 'detacts';
   const open = mkBtn('Abrir'); if (r.id == null) open.disabled = true; open.addEventListener('click', () => { try { chrome.downloads.open(r.id); } catch (e) { /* ignore */ } });
@@ -219,8 +220,9 @@ function detLeft(r) {
     } catch (e) { toast('Erro ao baixar: ' + e.message); }
   });
   acts.appendChild(open); acts.appendChild(show); acts.appendChild(dl);
-  left.appendChild(acts);
-  return left;
+  row.appendChild(acts);
+  head.appendChild(row);
+  return head;
 }
 
 // ---- conteúdo de uma aba (transcrição=texto, resumo=markdown), com 3 estados ----
@@ -284,10 +286,8 @@ function renderDetail(r) {
   back.addEventListener('click', backToList);
   c.appendChild(back);
 
-  const main = document.createElement('div'); main.className = 'detmain';
-  main.appendChild(detLeft(r));
-  main.appendChild(detRight(r));
-  c.appendChild(main);
+  c.appendChild(detHeader(r));
+  c.appendChild(detRight(r));
 }
 async function doAction(r, kind) {
   // Edge case principal: tentar transcrever/resumir sem chave -> leva pro campo da chave.
