@@ -22,16 +22,18 @@ async function mxBlobToBase64(blob) {
 // ----- prompts -----
 function mxTranscriptPrompt(lang) {
   const out = (lang === 'pt')
-    ? 'Entregue a transcrição em português (traduza se a fala estiver em outro idioma).'
-    : 'Transcreva no idioma falado, sem traduzir.';
-  return `Transcreva o ÁUDIO desta reunião o mais fiel possível. ${out} Não resuma — transcreva tudo o que foi dito, sem comentários seus.
-FORMATO OBRIGATÓRIO: comece CADA fala com o rótulo do interlocutor seguido de dois-pontos, com uma linha em branco entre as falas. Exemplo:
+    ? 'Escreva as falas em português (traduza se estiverem em outro idioma).'
+    : 'Escreva no idioma falado, sem traduzir.';
+  return `Atue como um analista de áudio especializado em DIARIZAÇÃO de locutores. Transcreva o áudio identificando com precisão CADA pessoa diferente que fala, separando o texto por locutor. ${out}
 
-Pessoa 1: ...texto...
+Regras:
+- Micro-falas: NUNCA ignore interrupções, falas curtas ou frases isoladas — inclusive nos segundos FINAIS. Processe o fim do áudio com a mesma atenção do início.
+- Contraste acústico: quando o TIMBRE da voz mudar claramente, trate como um NOVO locutor. Na dúvida real entre uma voz e outra, prefira SEPARAR.
+- Sem exagero: a MESMA pessoa mudando de tom/ritmo/emoção continua sendo o MESMO locutor. Só crie um novo locutor para uma VOZ realmente diferente.
+- Nomeie sequencialmente: "Locutor 1", "Locutor 2", "Locutor 3"… e use o MESMO número para a mesma voz. NÃO invente nomes próprios.
+- Transcreva tudo, sem resumir e sem comentários seus. Este áudio pode ser uma PARTE de uma reunião maior; transcreva só o que ouvir.
 
-Pessoa 2: ...texto...
-
-Use SEMPRE "Pessoa 1", "Pessoa 2", etc. (NÃO invente nomes próprios) e mantenha o mesmo número para a mesma voz. (Este áudio pode ser uma PARTE de uma reunião maior; transcreva só o que ouvir.)`;
+Retorne EXCLUSIVAMENTE um JSON válido: {"transcricao":[{"locutor":"Locutor 1","fala":"..."},{"locutor":"Locutor 2","fala":"..."}]}. Nada antes ou depois do JSON.`;
 }
 function mxSummaryPromptText(lang) {
   const out = (lang === 'pt')
@@ -54,15 +56,41 @@ function mxSummaryPromptText(lang) {
 Regras: não invente nada que não esteja na transcrição; se responsável/prazo não foi dito, escreva "—".`;
 }
 
+// Diarização: pedimos ao Gemini um JSON {transcricao:[{locutor,fala}]} e convertemos para o
+// texto "Locutor N: fala" que o resto do app já entende (chat, nomeação, resumo).
+const MX_DIAR_SCHEMA = {
+  type: 'object',
+  properties: {
+    transcricao: {
+      type: 'array',
+      items: { type: 'object', properties: { locutor: { type: 'string' }, fala: { type: 'string' } }, required: ['locutor', 'fala'] }
+    }
+  },
+  required: ['transcricao']
+};
+function mxJsonToTranscript(raw) {
+  let data;
+  try { data = JSON.parse(raw); } catch (e) { return String(raw || '').trim(); } // veio texto -> usa cru
+  const arr = (data && (data.transcricao || data.transcription || data.turns)) || (Array.isArray(data) ? data : []);
+  if (!Array.isArray(arr) || !arr.length) return String(raw || '').trim();
+  return arr.map((t) => {
+    const sp = String((t && (t.locutor || t.speaker || t.pessoa)) || 'Locutor 1').trim();
+    const fala = String((t && (t.fala || t.text || t.texto)) || '').trim();
+    return fala ? (sp + ': ' + fala) : '';
+  }).filter(Boolean).join('\n\n');
+}
+
 // ----- chamada base -----
-async function mxGeminiCall(key, model, parts) {
+async function mxGeminiCall(key, model, parts, genConfig) {
   const url = 'https://generativelanguage.googleapis.com/v1beta/models/' +
     encodeURIComponent(model || 'gemini-2.5-flash') + ':generateContent?key=' + encodeURIComponent(key);
+  const body = { contents: [{ parts }] };
+  if (genConfig) body.generationConfig = genConfig;
   let r;
   try {
     r = await fetch(url, {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ contents: [{ parts }] })
+      body: JSON.stringify(body)
     });
   } catch (e) { return { ok: false, error: 'rede: ' + e.message }; }
   if (!r.ok) {
@@ -78,22 +106,22 @@ async function mxGeminiCall(key, model, parts) {
 }
 
 // transcreve UM segmento (áudio inline)
-async function mxGeminiAudio(key, model, prompt, blob) {
+async function mxGeminiAudio(key, model, prompt, blob, genConfig) {
   if (!key) return { ok: false, error: 'Sem chave do Gemini (Ajustes → Resumo com IA).' };
   if (blob.size > MX_INLINE_MAX) return { ok: false, error: 'uma parte ficou grande demais (~14 MB) — reduza o bitrate em Ajustes.' };
   let b64;
   try { b64 = await mxBlobToBase64(blob); } catch (e) { return { ok: false, error: 'áudio: ' + e.message }; }
-  return mxGeminiCall(key, model, [{ text: prompt }, { inline_data: { mime_type: 'audio/mpeg', data: b64 } }]);
+  return mxGeminiCall(key, model, [{ text: prompt }, { inline_data: { mime_type: 'audio/mpeg', data: b64 } }], genConfig);
 }
 
 // mesma coisa, mas com backoff em 429/5xx (rate limit por minuto)
-async function mxGeminiAudioBackoff(key, model, prompt, blob, attempt) {
+async function mxGeminiAudioBackoff(key, model, prompt, blob, attempt, genConfig) {
   attempt = attempt || 0;
-  const r = await mxGeminiAudio(key, model, prompt, blob);
+  const r = await mxGeminiAudio(key, model, prompt, blob, genConfig);
   if (r.ok) return r;
   if (r.status && (r.status === 429 || r.status >= 500) && attempt < 4) {
     await mxSleep(Math.min(2000 * Math.pow(2, attempt), 20000) + Math.floor(Math.random() * 500));
-    return mxGeminiAudioBackoff(key, model, prompt, blob, attempt + 1);
+    return mxGeminiAudioBackoff(key, model, prompt, blob, attempt + 1, genConfig);
   }
   return r;
 }
@@ -104,16 +132,18 @@ async function mxTranscribeSegments(key, model, lang, blobs, onProgress) {
   if (!key) return { ok: false, error: 'Sem chave do Gemini (Ajustes → Resumo com IA).' };
   if (!blobs || !blobs.length) return { ok: false, error: 'sem áudio para transcrever.' };
   const prompt = mxTranscriptPrompt(lang);
+  // temperature 0 = transcrição fiel/estável; maxOutputTokens alto o bastante p/ ~15 min por parte.
+  const genConfig = { responseMimeType: 'application/json', responseSchema: MX_DIAR_SCHEMA, temperature: 0, maxOutputTokens: 8192 };
   const parts = [];
   for (let i = 0; i < blobs.length; i++) {
     if (onProgress) onProgress(i, blobs.length);
-    const r = await mxGeminiAudioBackoff(key, model, prompt, blobs[i]);
+    const r = await mxGeminiAudioBackoff(key, model, prompt, blobs[i], 0, genConfig);
     if (!r.ok) return { ok: false, error: 'parte ' + (i + 1) + '/' + blobs.length + ': ' + r.error, partial: parts.join('\n\n') };
-    parts.push(r.text);
+    parts.push(mxJsonToTranscript(r.text));
     if (i < blobs.length - 1) await mxSleep(MX_SPACING_MS);
   }
   if (onProgress) onProgress(blobs.length, blobs.length);
-  return { ok: true, text: parts.join('\n\n') };
+  return { ok: true, text: parts.filter(Boolean).join('\n\n') };
 }
 
 // resumo a partir do TEXTO da transcrição já juntada (sem áudio, sem limite de tamanho)
