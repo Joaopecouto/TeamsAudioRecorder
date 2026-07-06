@@ -20,11 +20,17 @@ async function mxBlobToBase64(blob) {
 }
 
 // ----- prompts -----
-function mxTranscriptPrompt(lang) {
+function mxTranscriptPrompt(lang, speakerCount) {
   const out = (lang === 'pt')
     ? 'Escreva as falas em português (traduza se estiverem em outro idioma).'
     : 'Escreva no idioma falado, sem traduzir.';
-  return `Atue como um analista de áudio especializado em DIARIZAÇÃO de locutores. Transcreva o áudio identificando com precisão CADA pessoa diferente que fala, separando o texto por locutor. ${out}
+  const n = parseInt(speakerCount, 10);
+  // saber o nº de vozes melhora MUITO a separação. Frase "chunk-safe": dá o total sem forçar
+  // que TODAS apareçam neste trecho (evita inventar um locutor onde só há dois).
+  const hint = (n && n > 0)
+    ? `CONTEXTO: a reunião inteira tem ${n} ${n === 1 ? 'pessoa distinta' : 'pessoas distintas'} (Locutor 1${n > 1 ? ' a Locutor ' + n : ''}). Separe as vozes com cuidado — NÃO junte duas pessoas no mesmo locutor. (Este trecho pode não conter todas as ${n}.) `
+    : '';
+  return `Atue como um analista de áudio especializado em DIARIZAÇÃO de locutores. ${hint}Transcreva o áudio identificando com precisão CADA pessoa diferente que fala, separando o texto por locutor. ${out}
 
 Regras:
 - Micro-falas: NUNCA ignore interrupções, falas curtas ou frases isoladas — inclusive nos segundos FINAIS. Processe o fim do áudio com a mesma atenção do início.
@@ -158,10 +164,10 @@ async function mxGeminiAudioBackoff(key, model, prompt, blob, attempt, genConfig
 
 // transcreve TODOS os segmentos em sequência (espaçados) e junta os textos.
 // onProgress(feito, total) atualiza a UI. Retorna { ok, text } ou { ok:false, error, partial }.
-async function mxTranscribeSegments(key, model, lang, blobs, onProgress, startSecs) {
+async function mxTranscribeSegments(key, model, lang, blobs, onProgress, startSecs, speakerCount) {
   if (!key) return { ok: false, error: 'Sem chave do Gemini (Ajustes → Resumo com IA).' };
   if (!blobs || !blobs.length) return { ok: false, error: 'sem áudio para transcrever.' };
-  const prompt = mxTranscriptPrompt(lang);
+  const prompt = mxTranscriptPrompt(lang, speakerCount);
   // temperature 0 = transcrição fiel/estável. thinkingBudget 0 = SEM "pensar" (o 2.5-flash
   // gasta tokens de saída pensando, o que truncava a transcrição); transcrever não precisa disso.
   const genConfig = { responseMimeType: 'application/json', responseSchema: MX_DIAR_SCHEMA, temperature: 0, maxOutputTokens: 8192, thinkingConfig: { thinkingBudget: 0 } };

@@ -253,6 +253,13 @@ function detLeft(r) {
   else if (!speakers.length) hint.textContent = 'Não deu para separar os falantes nesta gravação.';
   else hint.textContent = 'Nomeie cada voz. A barra mostra quando a pessoa falou e o % de participação.';
   box.appendChild(hint);
+  // dica de nº de vozes — quando você sabe quantos falaram, melhora MUITO a separação
+  const cnt = document.createElement('div'); cnt.className = 'pcount';
+  const cl = document.createElement('span'); cl.textContent = 'Quantas pessoas falaram?';
+  const ci = document.createElement('input'); ci.type = 'number'; ci.min = '1'; ci.max = '12'; ci.placeholder = 'auto'; ci.value = r.speakerHint || '';
+  ci.title = 'Opcional, mas ajuda MUITO a separar as vozes. Depois de mudar, clique em Transcrever (ou Refazer).';
+  ci.addEventListener('change', () => { const v = parseInt(ci.value, 10); updateRec(r.ts, { speakerHint: (v && v > 0) ? v : 0 }); });
+  cnt.appendChild(cl); cnt.appendChild(ci); box.appendChild(cnt);
   speakers.forEach((sp, i) => {
     const color = spColor(i);
     const p = document.createElement('div'); p.className = 'ppart';
@@ -426,7 +433,7 @@ async function doAction(r, kind) {
   const onProg = (d, t) => setBusyLabel(r.ts, d >= t ? 'Finalizando…' : ('Transcrevendo parte ' + (d + 1) + '/' + t + '…'));
 
   if (kind === 'transcript') {
-    const res = await mxTranscribeSegments(geminiKey, settings.geminiModel, settings.summaryLang, chunks, onProg, starts);
+    const res = await mxTranscribeSegments(geminiKey, settings.geminiModel, settings.summaryLang, chunks, onProg, starts, r.speakerHint);
     busy.delete(r.ts); delete progLabel[r.ts];
     if (res.ok) { updateRec(r.ts, { transcript: res.text }); toast('Transcrição pronta ✓'); loadRecordings(); }
     else finishErr(r, 'transcript', res);
@@ -436,7 +443,7 @@ async function doAction(r, kind) {
   // resumo: sai do TEXTO da transcrição já juntada. Se ainda não há transcrição, transcreve antes.
   let transcript = r.transcript;
   if (!transcript) {
-    const tr = await mxTranscribeSegments(geminiKey, settings.geminiModel, settings.summaryLang, chunks, onProg, starts);
+    const tr = await mxTranscribeSegments(geminiKey, settings.geminiModel, settings.summaryLang, chunks, onProg, starts, r.speakerHint);
     if (!tr.ok) { busy.delete(r.ts); delete progLabel[r.ts]; finishErr(r, 'summary', tr); return; }
     transcript = tr.text;
     updateRec(r.ts, { transcript }); // aproveita e guarda a transcrição
