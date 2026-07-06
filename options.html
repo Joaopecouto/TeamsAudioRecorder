@@ -132,9 +132,22 @@
     .tsearch { width: 100%; padding: 10px 12px; border: 1px solid var(--border); border-radius: 8px; font-size: 13px; margin-bottom: 12px; background: var(--surface); color: var(--ink); }
 
     .chat { display: flex; flex-direction: column; gap: 16px; max-height: 480px; overflow: auto; padding-right: 4px; }
-    .turnsp { font-size: 13px; font-weight: 700; margin-bottom: 4px; }
+    .turnhd { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; margin-bottom: 4px; }
+    .turnsp { font-size: 13px; font-weight: 700; }
+    .turnts { font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; flex: none; }
     .turntext { font-size: 14px; line-height: 1.6; color: var(--ink); white-space: pre-wrap; word-break: break-word; }
     .turn.hide { display: none; }
+    .turn.seekable { cursor: pointer; border-radius: 8px; margin: -6px -8px; padding: 6px 8px; }
+    .turn.seekable:hover { background: var(--surface-2); }
+
+    /* participantes: nome editável + linha do tempo de fala + % */
+    .ppart { margin-bottom: 14px; }
+    .ppart:last-child { margin-bottom: 0; }
+    .ptop { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+    .ptop input { flex: 1; min-width: 0; padding: 6px 8px; border: 1px solid var(--border); border-radius: 6px; font-size: 13px; background: var(--surface); color: var(--ink); }
+    .ppct { font-size: 12px; font-weight: 700; color: var(--muted); flex: none; }
+    .tl { position: relative; height: 8px; background: var(--surface-2); border-radius: 4px; overflow: hidden; }
+    .tlseg { position: absolute; top: 0; height: 100%; border-radius: 4px; }
 
     /* resumo em markdown renderizado */
     .md { font-size: 14px; line-height: 1.65; color: var(--ink); max-height: 520px; overflow: auto; }

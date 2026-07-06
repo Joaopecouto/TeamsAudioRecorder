@@ -202,16 +202,18 @@ function isSpeakerLabel(s) {
   if (/^(pessoa|speaker|interlocutor|locutor|participante)\s*\d+$/i.test(s)) return true;
   return s.length <= 32 && /^[A-ZÀ-Ú][\wÀ-ú'’.\-]*(\s+[A-ZÀ-Ú0-9][\wÀ-ú'’.\-]*){0,3}$/.test(s);
 }
+function tlabelToSec(l) { const m = String(l || '').match(/^(\d{1,2}):(\d{2})$/); return m ? parseInt(m[1], 10) * 60 + parseInt(m[2], 10) : null; }
 function parseTurns(text) {
   const lines = String(text || '').split('\n');
   const turns = [];
-  const re = /^\s*(?:\*\*|__)?\s*([^:\n]{1,38}?)\s*(?:\*\*|__)?\s*:\s*(.*)$/;
+  // opcional [MM:SS] + rótulo do locutor + ':' + fala
+  const re = /^\s*(?:\[(\d{1,2}:\d{2})\]\s*)?(?:\*\*|__)?\s*([^:\n\]]{1,38}?)\s*(?:\*\*|__)?\s*:\s*(.*)$/;
   for (const raw of lines) {
     const line = raw.replace(/\s+$/, '');
     const m = line.match(re);
-    if (m && isSpeakerLabel(m[1])) turns.push({ sp: m[1].trim(), text: m[2] });
+    if (m && isSpeakerLabel(m[2])) turns.push({ sp: m[2].trim(), tlabel: m[1] || '', tsec: m[1] ? tlabelToSec(m[1]) : null, text: m[3] });
     else if (turns.length) turns[turns.length - 1].text += '\n' + line;
-    else if (line.trim()) turns.push({ sp: '', text: line });
+    else if (line.trim()) turns.push({ sp: '', tlabel: '', tsec: null, text: line });
   }
   turns.forEach((t) => { t.text = t.text.replace(/\n{3,}/g, '\n\n').trim(); });
   return turns.filter((t) => t.sp || t.text);
@@ -235,17 +237,27 @@ function detLeft(r) {
   if (availTs.has(r.ts)) left.appendChild(getAudio(r));
   else { const d = document.createElement('div'); d.className = 'dempty'; d.textContent = 'Áudio não está mais salvo (guardamos as 12 gravações mais recentes).'; left.appendChild(d); }
 
-  const speakers = [...new Set(parseTurns(r.transcript || '').map((t) => t.sp).filter(Boolean))];
+  const turns = parseTurns(r.transcript || '');
+  const speakers = [...new Set(turns.map((t) => t.sp).filter(Boolean))];
+  // linha do tempo por pessoa: cada fala vai do seu início até o início da próxima (ou o fim)
+  const total = r.durationSec || turns.reduce((mx, t) => Math.max(mx, t.tsec || 0), 0) || 1;
+  const timed = turns.filter((t) => t.sp && t.tsec != null).sort((a, b) => a.tsec - b.tsec);
+  const segs = timed.map((t, i) => ({ sp: t.sp, start: t.tsec, end: (i < timed.length - 1 ? timed[i + 1].tsec : total) }));
+  const hasTL = segs.length > 0;
+  const talk = {}; segs.forEach((s) => { talk[s.sp] = (talk[s.sp] || 0) + Math.max(0, s.end - s.start); });
+
   const box = document.createElement('div'); box.className = 'parts';
   const h = document.createElement('h5'); h.textContent = 'Participantes'; box.appendChild(h);
   const hint = document.createElement('p'); hint.className = 'phint';
-  if (!r.transcript) hint.textContent = 'Transcreva para identificar as pessoas e dar nomes a elas.';
+  if (!r.transcript) hint.textContent = 'Transcreva para identificar as pessoas, ver quando cada uma falou e dar nomes.';
   else if (!speakers.length) hint.textContent = 'Não deu para separar os falantes nesta gravação.';
-  else hint.textContent = 'Dê um nome a cada voz — aparece na transcrição e no resumo.';
+  else hint.textContent = 'Nomeie cada voz. A barra mostra quando a pessoa falou e o % de participação.';
   box.appendChild(hint);
   speakers.forEach((sp, i) => {
-    const row = document.createElement('div'); row.className = 'part';
-    const dot = document.createElement('span'); dot.className = 'pdot'; dot.style.background = spColor(i);
+    const color = spColor(i);
+    const p = document.createElement('div'); p.className = 'ppart';
+    const top = document.createElement('div'); top.className = 'ptop';
+    const dot = document.createElement('span'); dot.className = 'pdot'; dot.style.background = color;
     const inp = document.createElement('input'); inp.type = 'text'; inp.value = (r.speakers || {})[sp] || ''; inp.placeholder = sp;
     inp.addEventListener('change', () => {
       const nm = Object.assign({}, r.speakers || {});
@@ -253,7 +265,21 @@ function detLeft(r) {
       if (v) nm[sp] = v; else delete nm[sp];
       updateRec(r.ts, { speakers: nm });
     });
-    row.appendChild(dot); row.appendChild(inp); box.appendChild(row);
+    top.appendChild(dot); top.appendChild(inp);
+    if (hasTL) { const pct = document.createElement('span'); pct.className = 'ppct'; pct.textContent = Math.round((talk[sp] || 0) / total * 100) + '%'; top.appendChild(pct); }
+    p.appendChild(top);
+    if (hasTL) {
+      const tl = document.createElement('div'); tl.className = 'tl';
+      segs.filter((s) => s.sp === sp).forEach((s) => {
+        const seg = document.createElement('div'); seg.className = 'tlseg';
+        seg.style.left = (s.start / total * 100) + '%';
+        seg.style.width = Math.max(0.6, (s.end - s.start) / total * 100) + '%';
+        seg.style.background = color;
+        tl.appendChild(seg);
+      });
+      p.appendChild(tl);
+    }
+    box.appendChild(p);
   });
   left.appendChild(box);
 
@@ -285,8 +311,14 @@ function renderTranscript(pane, r) {
   const chat = document.createElement('div'); chat.className = 'chat';
   turns.forEach((t) => {
     const row = document.createElement('div'); row.className = 'turn';
-    if (t.sp) { const nm = document.createElement('div'); nm.className = 'turnsp'; nm.textContent = map[t.sp] || t.sp; nm.style.color = spColor(distinct.indexOf(t.sp)); row.appendChild(nm); }
+    if (t.sp || t.tlabel) {
+      const hd = document.createElement('div'); hd.className = 'turnhd';
+      if (t.sp) { const nm = document.createElement('span'); nm.className = 'turnsp'; nm.textContent = map[t.sp] || t.sp; nm.style.color = spColor(distinct.indexOf(t.sp)); hd.appendChild(nm); }
+      if (t.tlabel) { const ts = document.createElement('span'); ts.className = 'turnts'; ts.textContent = t.tlabel; hd.appendChild(ts); }
+      row.appendChild(hd);
+    }
     const tx = document.createElement('div'); tx.className = 'turntext'; tx.textContent = t.text; row.appendChild(tx);
+    if (t.tsec != null) { row.classList.add('seekable'); row.title = 'Pular o áudio para ' + t.tlabel; row.addEventListener('click', () => seekAudio(r, t.tsec)); }
     chat.appendChild(row);
   });
   pane.appendChild(chat);
@@ -294,6 +326,10 @@ function renderTranscript(pane, r) {
     const q = search.value.trim().toLowerCase();
     chat.querySelectorAll('.turn').forEach((row) => row.classList.toggle('hide', !!q && row.textContent.toLowerCase().indexOf(q) === -1));
   });
+}
+function seekAudio(r, sec) {
+  const a = getAudio(r);
+  try { a.currentTime = sec; a.play().catch(() => {}); } catch (e) { /* ignore */ }
 }
 
 // ---- conteúdo de uma aba (transcrição=chat, resumo=markdown), com 3 estados ----
@@ -386,10 +422,11 @@ async function doAction(r, kind) {
     return;
   }
   const chunks = mxChunksFromBlob(blob, r.chunkBytes);
+  const starts = [0].concat(r.chunkSecs || []);
   const onProg = (d, t) => setBusyLabel(r.ts, d >= t ? 'Finalizando…' : ('Transcrevendo parte ' + (d + 1) + '/' + t + '…'));
 
   if (kind === 'transcript') {
-    const res = await mxTranscribeSegments(geminiKey, settings.geminiModel, settings.summaryLang, chunks, onProg);
+    const res = await mxTranscribeSegments(geminiKey, settings.geminiModel, settings.summaryLang, chunks, onProg, starts);
     busy.delete(r.ts); delete progLabel[r.ts];
     if (res.ok) { updateRec(r.ts, { transcript: res.text }); toast('Transcrição pronta ✓'); loadRecordings(); }
     else finishErr(r, 'transcript', res);
@@ -399,7 +436,7 @@ async function doAction(r, kind) {
   // resumo: sai do TEXTO da transcrição já juntada. Se ainda não há transcrição, transcreve antes.
   let transcript = r.transcript;
   if (!transcript) {
-    const tr = await mxTranscribeSegments(geminiKey, settings.geminiModel, settings.summaryLang, chunks, onProg);
+    const tr = await mxTranscribeSegments(geminiKey, settings.geminiModel, settings.summaryLang, chunks, onProg, starts);
     if (!tr.ok) { busy.delete(r.ts); delete progLabel[r.ts]; finishErr(r, 'summary', tr); return; }
     transcript = tr.text;
     updateRec(r.ts, { transcript }); // aproveita e guarda a transcrição

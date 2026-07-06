@@ -33,7 +33,8 @@ Regras:
 - Nomeie sequencialmente: "Locutor 1", "Locutor 2", "Locutor 3"… e use o MESMO número para a mesma voz. NÃO invente nomes próprios.
 - Transcreva tudo, sem resumir e sem comentários seus. Este áudio pode ser uma PARTE de uma reunião maior; transcreva só o que ouvir.
 
-Retorne EXCLUSIVAMENTE um JSON válido: {"transcricao":[{"locutor":"Locutor 1","fala":"..."},{"locutor":"Locutor 2","fala":"..."}]}. Nada antes ou depois do JSON.`;
+Em cada fala inclua também "inicio" = tempo APROXIMADO de início, em SEGUNDOS desde o começo DESTE áudio (número inteiro).
+Retorne EXCLUSIVAMENTE um JSON válido: {"transcricao":[{"inicio":0,"locutor":"Locutor 1","fala":"..."},{"inicio":8,"locutor":"Locutor 2","fala":"..."}]}. Nada antes ou depois do JSON.`;
 }
 function mxSummaryPromptText(lang) {
   const out = (lang === 'pt')
@@ -63,12 +64,26 @@ const MX_DIAR_SCHEMA = {
   properties: {
     transcricao: {
       type: 'array',
-      items: { type: 'object', properties: { locutor: { type: 'string' }, fala: { type: 'string' } }, required: ['locutor', 'fala'] }
+      items: { type: 'object', properties: { inicio: { type: 'number' }, locutor: { type: 'string' }, fala: { type: 'string' } }, required: ['locutor', 'fala'] }
     }
   },
   required: ['transcricao']
 };
-function mxJsonToTranscript(raw) {
+function mxSecToLabel(s) {
+  s = Math.max(0, Math.round(s || 0));
+  return String(Math.floor(s / 60)).padStart(2, '0') + ':' + String(s % 60).padStart(2, '0');
+}
+function mxParseSec(v) {
+  if (typeof v === 'number' && isFinite(v)) return v;
+  const s = String(v == null ? '' : v).trim();
+  const m = s.match(/^(\d+):(\d{1,2})$/);
+  if (m) return parseInt(m[1], 10) * 60 + parseInt(m[2], 10);
+  const n = parseFloat(s);
+  return isFinite(n) ? n : null;
+}
+// JSON do Gemini -> "[MM:SS] Locutor N: fala" (o timestamp leva o offset de início da parte)
+function mxJsonToTranscript(raw, offsetSec) {
+  offsetSec = offsetSec || 0;
   let data;
   try { data = JSON.parse(raw); } catch (e) { return String(raw || '').trim(); } // veio texto -> usa cru
   const arr = (data && (data.transcricao || data.transcription || data.turns)) || (Array.isArray(data) ? data : []);
@@ -76,7 +91,10 @@ function mxJsonToTranscript(raw) {
   return arr.map((t) => {
     const sp = String((t && (t.locutor || t.speaker || t.pessoa)) || 'Locutor 1').trim();
     const fala = String((t && (t.fala || t.text || t.texto)) || '').trim();
-    return fala ? (sp + ': ' + fala) : '';
+    if (!fala) return '';
+    const sec = mxParseSec(t && (t.inicio != null ? t.inicio : (t.start != null ? t.start : (t.tempo != null ? t.tempo : t.timestamp))));
+    const stamp = (sec != null) ? ('[' + mxSecToLabel(sec + offsetSec) + '] ') : '';
+    return stamp + sp + ': ' + fala;
   }).filter(Boolean).join('\n\n');
 }
 
@@ -128,7 +146,7 @@ async function mxGeminiAudioBackoff(key, model, prompt, blob, attempt, genConfig
 
 // transcreve TODOS os segmentos em sequência (espaçados) e junta os textos.
 // onProgress(feito, total) atualiza a UI. Retorna { ok, text } ou { ok:false, error, partial }.
-async function mxTranscribeSegments(key, model, lang, blobs, onProgress) {
+async function mxTranscribeSegments(key, model, lang, blobs, onProgress, startSecs) {
   if (!key) return { ok: false, error: 'Sem chave do Gemini (Ajustes → Resumo com IA).' };
   if (!blobs || !blobs.length) return { ok: false, error: 'sem áudio para transcrever.' };
   const prompt = mxTranscriptPrompt(lang);
@@ -139,7 +157,7 @@ async function mxTranscribeSegments(key, model, lang, blobs, onProgress) {
     if (onProgress) onProgress(i, blobs.length);
     const r = await mxGeminiAudioBackoff(key, model, prompt, blobs[i], 0, genConfig);
     if (!r.ok) return { ok: false, error: 'parte ' + (i + 1) + '/' + blobs.length + ': ' + r.error, partial: parts.join('\n\n') };
-    parts.push(mxJsonToTranscript(r.text));
+    parts.push(mxJsonToTranscript(r.text, (startSecs && startSecs[i]) || 0));
     if (i < blobs.length - 1) await mxSleep(MX_SPACING_MS);
   }
   if (onProgress) onProgress(blobs.length, blobs.length);

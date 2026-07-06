@@ -32,6 +32,7 @@ let carry = new Float32Array(0); // sobra de PCM (<1152) entre callbacks
 let mp3Bytes = [];               // Uint8Array[] — o ARQUIVO INTEIRO (um só)
 let byteLen = 0;                 // bytes acumulados (sempre em limite de frame)
 let cutBytes = [];               // offsets de byte onde cada parte de transcrição começa/termina
+let cutSecs = [];                // tempo (s) de cada corte — p/ posicionar os timestamps das falas
 let totalSamples = 0;
 let blocksProcessed = 0;         // watchdog: precisa avançar durante a gravação
 let watchdog = null;
@@ -128,7 +129,7 @@ async function start(opts) {
 
     encoder = new lamejs.Mp3Encoder(1, sampleRate, bitrate);
     carry = new Float32Array(0);
-    mp3Bytes = []; byteLen = 0; cutBytes = []; totalSamples = 0; blocksProcessed = 0;
+    mp3Bytes = []; byteLen = 0; cutBytes = []; cutSecs = []; totalSamples = 0; blocksProcessed = 0;
     recTs = Date.now(); stopping = false;
 
     scriptNode.onaudioprocess = onAudio;
@@ -177,7 +178,7 @@ function onAudio(e) {
 
   // marca os CORTES de transcrição (só offsets de byte; o encoder NÃO é cortado -> arquivo
   // continua inteiro). byteLen aqui está sempre num limite de frame (lamejs emite frames inteiros).
-  while (totalSamples >= nextCutSamples) { cutBytes.push(byteLen); nextCutSamples += samplesPerChunk; }
+  while (totalSamples >= nextCutSamples) { cutBytes.push(byteLen); cutSecs.push(totalSamples / sampleRate); nextCutSamples += samplesPerChunk; }
 }
 
 async function stop() {
@@ -217,7 +218,7 @@ async function stop() {
 
     chrome.runtime.sendMessage({
       type: 'REC_DONE', ts: recTs, sizeMB, durationSec, source: srcLabel, micUsed,
-      chunkBytes: cutBytes, blobUrl
+      chunkBytes: cutBytes, chunkSecs: cutSecs, blobUrl
     }).catch(() => {});
     setTimeout(() => { try { URL.revokeObjectURL(blobUrl); } catch (e) { /* ignore */ } }, 120000);
   } catch (e) {
@@ -234,6 +235,6 @@ function cleanup(keepStopping) {
   try { if (ctx && ctx.state !== 'closed') ctx.close(); } catch (e) { /* ignore */ }
   if (watchdog) { clearInterval(watchdog); watchdog = null; }
   scriptNode = null; sinkGain = null; captureStream = null; micStream = null; ctx = null; encoder = null;
-  carry = new Float32Array(0); mp3Bytes = []; cutBytes = [];
+  carry = new Float32Array(0); mp3Bytes = []; cutBytes = []; cutSecs = [];
   if (!keepStopping) stopping = false;
 }
