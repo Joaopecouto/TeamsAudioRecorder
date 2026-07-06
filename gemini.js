@@ -81,12 +81,24 @@ function mxParseSec(v) {
   const n = parseFloat(s);
   return isFinite(n) ? n : null;
 }
+// tenta JSON.parse; se veio truncado (finishReason MAX_TOKENS), fecha no último objeto completo
+function mxParseLoose(raw) {
+  try { return JSON.parse(raw); } catch (e) { /* segue p/ salvamento */ }
+  const s = String(raw || '');
+  const last = s.lastIndexOf('}');
+  if (last > 0) {
+    let cut = s.slice(0, last + 1);
+    if (!/\]\s*\}\s*$/.test(cut)) cut += ']}';
+    try { return JSON.parse(cut); } catch (e) { /* desiste */ }
+  }
+  return null;
+}
 // JSON do Gemini -> "[MM:SS] Locutor N: fala" (o timestamp leva o offset de início da parte)
 function mxJsonToTranscript(raw, offsetSec) {
   offsetSec = offsetSec || 0;
-  let data;
-  try { data = JSON.parse(raw); } catch (e) { return String(raw || '').trim(); } // veio texto -> usa cru
-  const arr = (data && (data.transcricao || data.transcription || data.turns)) || (Array.isArray(data) ? data : []);
+  const data = mxParseLoose(raw);
+  if (!data) return String(raw || '').trim(); // não era JSON -> usa cru
+  const arr = (data.transcricao || data.transcription || data.turns) || (Array.isArray(data) ? data : []);
   if (!Array.isArray(arr) || !arr.length) return String(raw || '').trim();
   return arr.map((t) => {
     const sp = String((t && (t.locutor || t.speaker || t.pessoa)) || 'Locutor 1').trim();
@@ -150,8 +162,9 @@ async function mxTranscribeSegments(key, model, lang, blobs, onProgress, startSe
   if (!key) return { ok: false, error: 'Sem chave do Gemini (Ajustes → Resumo com IA).' };
   if (!blobs || !blobs.length) return { ok: false, error: 'sem áudio para transcrever.' };
   const prompt = mxTranscriptPrompt(lang);
-  // temperature 0 = transcrição fiel/estável; maxOutputTokens alto o bastante p/ ~15 min por parte.
-  const genConfig = { responseMimeType: 'application/json', responseSchema: MX_DIAR_SCHEMA, temperature: 0, maxOutputTokens: 8192 };
+  // temperature 0 = transcrição fiel/estável. thinkingBudget 0 = SEM "pensar" (o 2.5-flash
+  // gasta tokens de saída pensando, o que truncava a transcrição); transcrever não precisa disso.
+  const genConfig = { responseMimeType: 'application/json', responseSchema: MX_DIAR_SCHEMA, temperature: 0, maxOutputTokens: 8192, thinkingConfig: { thinkingBudget: 0 } };
   const parts = [];
   for (let i = 0; i < blobs.length; i++) {
     if (onProgress) onProgress(i, blobs.length);

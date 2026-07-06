@@ -123,7 +123,10 @@ async function start(opts) {
     // 5) encoder ÚNICO + tamanho da PARTE de transcrição, derivado do bitrate p/ cada parte
     //    ficar < ~11 MB (folga sob o limite inline do Gemini). Fonte única: esta fórmula.
     const TARGET_BYTES = 11 * 1024 * 1024;
-    const secPerChunk = Math.max(60, Math.floor((TARGET_BYTES * 8) / (bitrate * 1000)));
+    const secByBytes = Math.floor((TARGET_BYTES * 8) / (bitrate * 1000));
+    // corta por TAMANHO (limite de upload) OU por 10 min (limite de tokens de SAÍDA do Gemini,
+    // p/ a transcrição de cada parte não truncar) — o que vier primeiro.
+    const secPerChunk = Math.max(60, Math.min(secByBytes, 600));
     samplesPerChunk = secPerChunk * sampleRate;
     nextCutSamples = samplesPerChunk;
 
