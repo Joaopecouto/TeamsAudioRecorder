@@ -80,6 +80,38 @@
     .panel .acts { display: flex; gap: 8px; margin-top: 8px; }
     .empty { font-size: 14px; color: var(--muted); text-align: center; padding: 48px 0; }
 
+    /* ---- lista de gravações (cards clicáveis) ---- */
+    .reccard { width: 100%; text-align: left; display: flex; align-items: center; gap: 16px; padding: 16px; border: 1px solid var(--border); border-radius: 12px; margin-bottom: 12px; background: #fff; cursor: pointer; font-family: inherit; transition: border-color .15s, background .15s; }
+    .reccard:hover { border-color: var(--teal); background: var(--surface-2); }
+    .reccard .recinfo { flex: 1; min-width: 0; }
+    .reccard .recname { font-size: 14px; font-weight: 600; color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .reccard .recmeta { font-size: 12px; color: var(--muted); margin-top: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .recstatus { display: flex; align-items: center; gap: 8px; flex: none; }
+    .tag { font-size: 11px; padding: 4px 10px; border-radius: 24px; background: var(--surface-2); color: var(--muted); white-space: nowrap; }
+    .tag.on { background: hsl(188 40% 92%); color: var(--teal-strong); font-weight: 600; }
+    .tag.busy { background: hsl(40 92% 92%); color: hsl(35 74% 34%); font-weight: 600; }
+    .chev { color: var(--muted); font-size: 22px; line-height: 1; flex: none; }
+
+    /* ---- detalhe da gravação (transcrição | resumo) ---- */
+    .back { display: inline-flex; align-items: center; gap: 8px; border: 0; background: transparent; color: var(--teal); font-size: 14px; font-weight: 700; cursor: pointer; padding: 8px 0; margin-bottom: 8px; font-family: inherit; }
+    .back:hover { color: var(--teal-strong); }
+    .dethead { padding-bottom: 24px; border-bottom: 1px solid var(--border); margin-bottom: 24px; }
+    .detname { font-size: 18px; font-weight: 700; color: var(--ink); word-break: break-word; }
+    .detmeta { font-size: 13px; color: var(--muted); margin-top: 6px; }
+    .detacts { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 16px; }
+    .detcols { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 16px; }
+    .detcol { border: 1px solid var(--border); border-radius: 12px; padding: 20px; background: var(--surface); min-width: 0; }
+    .detcol h4 { font-size: 15px; font-weight: 700; color: var(--ink); margin: 0; display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+    .detcol h4 .sub { font-size: 12px; font-weight: 400; color: var(--muted); }
+    .detbody { margin-top: 16px; }
+    .dtext { background: #fff; border: 1px solid var(--border); border-radius: 8px; padding: 16px; font-size: 13px; line-height: 1.6; white-space: pre-wrap; word-break: break-word; color: var(--ink); max-height: 440px; overflow: auto; }
+    .dempty { font-size: 13px; color: var(--muted); line-height: 1.6; margin-bottom: 16px; }
+    .dacts { display: flex; gap: 8px; margin-top: 12px; flex-wrap: wrap; }
+    .prog { display: flex; align-items: center; gap: 12px; padding: 16px; background: var(--surface-2); border-radius: 8px; font-size: 13px; font-weight: 600; color: var(--teal-strong); }
+    .spinner { width: 16px; height: 16px; border: 2px solid hsl(188 30% 82%); border-top-color: var(--teal); border-radius: 50%; animation: spin .7s linear infinite; flex: none; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .wrap.wide { max-width: 900px; }
+
     .saved { position: fixed; left: 50%; bottom: 24px; transform: translate(-50%, 16px); background: var(--teal); color: hsl(188 40% 97%); padding: 12px 24px; border-radius: 24px; font-size: 14px; opacity: 0; pointer-events: none; transition: .25s ease; max-width: 80%; text-align: center; }
     .saved.show { opacity: 1; transform: translate(-50%, 0); }
   </style>

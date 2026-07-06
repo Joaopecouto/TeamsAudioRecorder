@@ -133,62 +133,119 @@ function updateRec(ts, patch) {
 async function refreshAvail() { try { availTs = new Set(await mxIdbKeys()); } catch (e) { availTs = new Set(); } }
 function loadRecordings() { refreshAvail().then(() => chrome.storage.local.get({ recordings: [] }, ({ recordings }) => render(recordings))); }
 
-function buildPanel(r, kind) {
-  const text = kind === 'transcript' ? r.transcript : r.summary;
-  const p = document.createElement('div'); p.className = 'panel';
-  const t = document.createElement('div'); t.className = 'txt'; t.textContent = text;
-  const acts = document.createElement('div'); acts.className = 'acts';
-  const cp = mkBtn('Copiar'); cp.addEventListener('click', () => { navigator.clipboard.writeText(text); cp.textContent = 'Copiado ✓'; setTimeout(() => (cp.textContent = 'Copiar'), 1200); });
-  const ext = kind === 'transcript' ? '-transcricao.txt' : '-resumo.md';
-  const mt = kind === 'transcript' ? 'text/plain' : 'text/markdown';
-  const dl = mkBtn('Baixar'); dl.addEventListener('click', () => {
-    const u = URL.createObjectURL(new Blob([text], { type: mt }));
-    chrome.downloads.download({ url: u, filename: (r.folder ? r.folder + '/' : '') + r.name.replace(/\.mp3$/, '') + ext, saveAs: false });
-  });
-  acts.appendChild(cp); acts.appendChild(dl);
-  p.appendChild(t); p.appendChild(acts);
-  return p;
-}
+let detailTs = null; // ts da gravação aberta em detalhe; null = mostrando a lista
+function setWide(on) { const w = document.querySelector('.wrap'); if (w) w.classList.toggle('wide', !!on); }
+function openDetail(ts) { detailTs = ts; setWide(true); window.scrollTo(0, 0); loadRecordings(); }
+function backToList() { detailTs = null; setWide(false); loadRecordings(); }
+
 function render(list) {
   updateNoKeyHint();
+  const rh = document.querySelector('.rechead');
+  if (detailTs != null) {
+    const rec = list.find((r) => r.ts === detailTs);
+    if (rec) { if (rh) rh.style.display = 'none'; renderDetail(rec); return; }
+    detailTs = null; setWide(false); // a gravação sumiu -> volta pra lista
+  }
+  if (rh) rh.style.display = 'flex';
+  renderList(list);
+}
+
+// ---- lista: cards clicáveis, nome/meta em 1 linha (nunca quebra vertical) ----
+function renderList(list) {
   const c = $('recList'); c.innerHTML = '';
   if (!list.length) { c.innerHTML = '<div class="empty">Nenhuma gravação ainda.</div>'; return; }
   list.forEach((r) => {
-    const item = document.createElement('div'); item.className = 'recitem';
-    const line = document.createElement('div'); line.className = 'recline';
-    const info = document.createElement('div'); info.style.flex = '1'; info.style.minWidth = '0';
+    const card = document.createElement('button'); card.className = 'reccard';
+    const info = document.createElement('div'); info.className = 'recinfo';
     info.innerHTML = '<div class="recname">' + esc(r.name) + '</div><div class="recmeta">' +
       whenStr(r.ts) + ' · ' + mmss(r.durationSec) + ' · ' + r.sizeMB + ' MB · ' + esc(r.source) + (r.mic ? ' + mic' : '') + '</div>';
-    const btns = document.createElement('div'); btns.className = 'recbtns';
-    const open = mkBtn('Abrir'); if (r.id == null) open.disabled = true; open.addEventListener('click', () => { try { chrome.downloads.open(r.id); } catch (e) { /* ignore */ } });
-    const show = mkBtn('Pasta'); if (r.id == null) show.disabled = true; show.addEventListener('click', () => { try { chrome.downloads.show(r.id); } catch (e) { /* ignore */ } });
-    const dl = mkBtn('Baixar MP3'); if (!availTs.has(r.ts)) { dl.disabled = true; dl.title = 'Áudio não está mais salvo'; }
-    dl.addEventListener('click', async () => {
-      try {
-        const b = await mxIdbGet(r.ts);
-        if (!b) { toast('Áudio não está mais salvo.'); return; }
-        const u = URL.createObjectURL(b);
-        chrome.downloads.download({ url: u, filename: (r.folder ? r.folder + '/' : '') + r.name, saveAs: false });
-      } catch (e) { toast('Erro ao baixar: ' + e.message); }
-    });
-    btns.appendChild(open); btns.appendChild(show); btns.appendChild(dl);
-
-    // transcrição (desabilita só quando o áudio não está mais salvo; sem chave é tratado no clique)
-    if (busyT.has(r.ts)) { const b = mkBtn(progLabel[r.ts] || 'Transcrevendo…'); b.disabled = true; btns.appendChild(b); }
-    else if (r.transcript) { const b = mkBtn('Transcrição'); b.addEventListener('click', () => { openT.has(r.ts) ? openT.delete(r.ts) : openT.add(r.ts); render(list); }); btns.appendChild(b); }
-    else { const b = mkBtn('Transcrever'); if (!availTs.has(r.ts)) { b.disabled = true; b.title = 'Áudio não está mais salvo'; } b.addEventListener('click', () => doAction(r, 'transcript')); btns.appendChild(b); }
-
-    // resumo
-    if (busyS.has(r.ts)) { const b = mkBtn(progLabel[r.ts] || 'Resumindo…'); b.disabled = true; btns.appendChild(b); }
-    else if (r.summary) { const b = mkBtn('Resumo'); b.addEventListener('click', () => { openS.has(r.ts) ? openS.delete(r.ts) : openS.add(r.ts); render(list); }); btns.appendChild(b); }
-    else { const b = mkBtn('Criar resumo'); b.classList.add('fill'); if (!availTs.has(r.ts)) { b.disabled = true; b.classList.remove('fill'); b.title = 'Áudio não está mais salvo'; } b.addEventListener('click', () => doAction(r, 'summary')); btns.appendChild(b); }
-
-    line.appendChild(info); line.appendChild(btns);
-    item.appendChild(line);
-    if (openT.has(r.ts) && r.transcript) item.appendChild(buildPanel(r, 'transcript'));
-    if (openS.has(r.ts) && r.summary) item.appendChild(buildPanel(r, 'summary'));
-    c.appendChild(item);
+    const st = document.createElement('div'); st.className = 'recstatus';
+    if (busyT.has(r.ts) || busyS.has(r.ts)) { const t = document.createElement('span'); t.className = 'tag busy'; t.textContent = 'Processando…'; st.appendChild(t); }
+    else {
+      if (r.transcript) { const t = document.createElement('span'); t.className = 'tag on'; t.textContent = 'Transcrita'; st.appendChild(t); }
+      if (r.summary) { const t = document.createElement('span'); t.className = 'tag on'; t.textContent = 'Resumo'; st.appendChild(t); }
+    }
+    const ch = document.createElement('span'); ch.className = 'chev'; ch.textContent = '›'; st.appendChild(ch);
+    card.appendChild(info); card.appendChild(st);
+    card.addEventListener('click', () => openDetail(r.ts));
+    c.appendChild(card);
   });
+}
+
+function dlText(r, kind, text) {
+  const ext = kind === 'transcript' ? '-transcricao.txt' : '-resumo.md';
+  const mt = kind === 'transcript' ? 'text/plain' : 'text/markdown';
+  const u = URL.createObjectURL(new Blob([text], { type: mt }));
+  chrome.downloads.download({ url: u, filename: (r.folder ? r.folder + '/' : '') + r.name.replace(/\.mp3$/, '') + ext, saveAs: false });
+}
+
+// ---- uma coluna do detalhe (Transcrição ou Resumo), com seus 3 estados ----
+function detCol(r, kind) {
+  const isT = kind === 'transcript';
+  const text = isT ? r.transcript : r.summary;
+  const col = document.createElement('section'); col.className = 'detcol';
+  const h = document.createElement('h4');
+  h.innerHTML = (isT ? 'Transcrição' : 'Resumo') + ' <span class="sub">' + (isT ? 'tudo o que foi dito, na íntegra' : 'decisões, tarefas e próximos passos') + '</span>';
+  col.appendChild(h);
+  const body = document.createElement('div'); body.className = 'detbody';
+
+  if ((isT ? busyT : busyS).has(r.ts)) {
+    const p = document.createElement('div'); p.className = 'prog';
+    const sp = document.createElement('span'); sp.className = 'spinner';
+    const tx = document.createElement('span'); tx.textContent = progLabel[r.ts] || (isT ? 'Transcrevendo…' : 'Resumindo…');
+    p.appendChild(sp); p.appendChild(tx); body.appendChild(p);
+  } else if (text) {
+    const t = document.createElement('div'); t.className = 'dtext'; t.textContent = text; body.appendChild(t);
+    const a = document.createElement('div'); a.className = 'dacts';
+    const cp = mkBtn('Copiar'); cp.addEventListener('click', () => { navigator.clipboard.writeText(text); cp.textContent = 'Copiado ✓'; setTimeout(() => (cp.textContent = 'Copiar'), 1200); });
+    const bd = mkBtn('Baixar'); bd.addEventListener('click', () => dlText(r, kind, text));
+    const re = mkBtn('Refazer'); if (!availTs.has(r.ts)) { re.disabled = true; re.title = 'Áudio não está mais salvo'; } re.addEventListener('click', () => doAction(r, kind));
+    a.appendChild(cp); a.appendChild(bd); a.appendChild(re);
+    body.appendChild(a);
+  } else {
+    const d = document.createElement('div'); d.className = 'dempty';
+    d.textContent = isT ? 'Ainda não transcrita. A extensão manda o áudio ao Gemini em partes e junta o texto.' : 'Ainda sem resumo. Sai da transcrição: resumo executivo, decisões, itens de ação e próximos passos.';
+    body.appendChild(d);
+    const btn = mkBtn(isT ? 'Transcrever' : 'Criar resumo'); btn.classList.add('fill');
+    if (!availTs.has(r.ts)) { btn.disabled = true; btn.classList.remove('fill'); btn.title = 'Áudio não está mais salvo'; }
+    btn.addEventListener('click', () => doAction(r, kind));
+    body.appendChild(btn);
+  }
+  col.appendChild(body);
+  return col;
+}
+
+// ---- detalhe: voltar + cabeçalho + duas colunas (transcrição | resumo) ----
+function renderDetail(r) {
+  const c = $('recList'); c.innerHTML = '';
+  const back = document.createElement('button'); back.className = 'back';
+  back.textContent = '← Voltar para gravações';
+  back.addEventListener('click', backToList);
+  c.appendChild(back);
+
+  const head = document.createElement('div'); head.className = 'dethead';
+  head.innerHTML = '<div class="detname">' + esc(r.name) + '</div><div class="detmeta">' +
+    whenStr(r.ts) + ' · ' + mmss(r.durationSec) + ' · ' + r.sizeMB + ' MB · ' + esc(r.source) + (r.mic ? ' + microfone' : '') + '</div>';
+  const acts = document.createElement('div'); acts.className = 'detacts';
+  const open = mkBtn('Abrir'); if (r.id == null) open.disabled = true; open.addEventListener('click', () => { try { chrome.downloads.open(r.id); } catch (e) { /* ignore */ } });
+  const show = mkBtn('Pasta'); if (r.id == null) show.disabled = true; show.addEventListener('click', () => { try { chrome.downloads.show(r.id); } catch (e) { /* ignore */ } });
+  const dl = mkBtn('Baixar MP3'); if (!availTs.has(r.ts)) { dl.disabled = true; dl.title = 'Áudio não está mais salvo'; }
+  dl.addEventListener('click', async () => {
+    try {
+      const b = await mxIdbGet(r.ts);
+      if (!b) { toast('Áudio não está mais salvo.'); return; }
+      const u = URL.createObjectURL(b);
+      chrome.downloads.download({ url: u, filename: (r.folder ? r.folder + '/' : '') + r.name, saveAs: false });
+    } catch (e) { toast('Erro ao baixar: ' + e.message); }
+  });
+  acts.appendChild(open); acts.appendChild(show); acts.appendChild(dl);
+  head.appendChild(acts);
+  c.appendChild(head);
+
+  const cols = document.createElement('div'); cols.className = 'detcols';
+  cols.appendChild(detCol(r, 'transcript'));
+  cols.appendChild(detCol(r, 'summary'));
+  c.appendChild(cols);
 }
 async function doAction(r, kind) {
   // Edge case principal: tentar transcrever/resumir sem chave -> leva pro campo da chave.
@@ -214,7 +271,7 @@ async function doAction(r, kind) {
   if (kind === 'transcript') {
     const res = await mxTranscribeSegments(geminiKey, settings.geminiModel, settings.summaryLang, chunks, onProg);
     busy.delete(r.ts); delete progLabel[r.ts];
-    if (res.ok) { openT.add(r.ts); updateRec(r.ts, { transcript: res.text }); toast('Transcrição pronta ✓'); loadRecordings(); }
+    if (res.ok) { updateRec(r.ts, { transcript: res.text }); toast('Transcrição pronta ✓'); loadRecordings(); }
     else finishErr(r, 'transcript', res);
     return;
   }
@@ -230,7 +287,7 @@ async function doAction(r, kind) {
   setBusyLabel(r.ts, 'Resumindo…');
   const sres = await mxSummarizeTranscript(geminiKey, settings.geminiModel, settings.summaryLang, transcript);
   busy.delete(r.ts); delete progLabel[r.ts];
-  if (sres.ok) { openS.add(r.ts); updateRec(r.ts, { summary: sres.text }); toast('Resumo pronto ✓'); loadRecordings(); }
+  if (sres.ok) { updateRec(r.ts, { summary: sres.text }); toast('Resumo pronto ✓'); loadRecordings(); }
   else finishErr(r, 'summary', sres);
 }
 
@@ -258,7 +315,8 @@ function showTab(which) {
   document.querySelectorAll('.tab').forEach((t) => t.classList.toggle('active', t.dataset.tab === which));
   $('pane-cap').classList.toggle('hidden', which !== 'cap');
   $('pane-rec').classList.toggle('hidden', which !== 'rec');
-  if (which === 'rec') loadRecordings();
+  if (which === 'rec') { detailTs = null; setWide(false); loadRecordings(); }
+  else setWide(false);
 }
 document.querySelectorAll('.tab').forEach((t) => t.addEventListener('click', () => showTab(t.dataset.tab)));
 
