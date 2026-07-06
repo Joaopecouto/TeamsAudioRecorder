@@ -198,6 +198,11 @@ function clearAudio() { if (audioUrl) { try { URL.revokeObjectURL(audioUrl); } c
 function detLeft(r) {
   const left = document.createElement('div'); left.className = 'detleft';
 
+  const head = document.createElement('div'); head.className = 'dethead';
+  head.innerHTML = '<div class="detname">' + esc(r.name) + '</div><div class="detmeta">' +
+    whenStr(r.ts) + ' · ' + mmss(r.durationSec) + ' · ' + r.sizeMB + ' MB · ' + esc(r.source) + (r.mic ? ' + microfone' : '') + '</div>';
+  left.appendChild(head);
+
   if (availTs.has(r.ts)) left.appendChild(getAudio(r));
   else { const d = document.createElement('div'); d.className = 'dempty'; d.textContent = 'Áudio não está mais salvo (guardamos as 12 gravações mais recentes).'; left.appendChild(d); }
 
@@ -278,11 +283,6 @@ function renderDetail(r) {
   back.textContent = '← Voltar para gravações';
   back.addEventListener('click', backToList);
   c.appendChild(back);
-
-  const head = document.createElement('div'); head.className = 'dethead';
-  head.innerHTML = '<div class="detname">' + esc(r.name) + '</div><div class="detmeta">' +
-    whenStr(r.ts) + ' · ' + mmss(r.durationSec) + ' · ' + r.sizeMB + ' MB · ' + esc(r.source) + (r.mic ? ' + microfone' : '') + '</div>';
-  c.appendChild(head);
 
   const main = document.createElement('div'); main.className = 'detmain';
   main.appendChild(detLeft(r));
