@@ -24,7 +24,14 @@ function mxTranscriptPrompt(lang) {
   const out = (lang === 'pt')
     ? 'Entregue a transcrição em português (traduza se a fala estiver em outro idioma).'
     : 'Transcreva no idioma falado, sem traduzir.';
-  return `Transcreva o ÁUDIO desta reunião o mais fiel possível. Identifique mudanças de interlocutor como "Pessoa 1:", "Pessoa 2:" quando der para distinguir. ${out} Não resuma — transcreva tudo o que foi dito. Retorne apenas o texto falado, sem comentários seus. (Este áudio pode ser uma PARTE de uma reunião maior; transcreva só o que ouvir.)`;
+  return `Transcreva o ÁUDIO desta reunião o mais fiel possível. ${out} Não resuma — transcreva tudo o que foi dito, sem comentários seus.
+FORMATO OBRIGATÓRIO: comece CADA fala com o rótulo do interlocutor seguido de dois-pontos, com uma linha em branco entre as falas. Exemplo:
+
+Pessoa 1: ...texto...
+
+Pessoa 2: ...texto...
+
+Use SEMPRE "Pessoa 1", "Pessoa 2", etc. (NÃO invente nomes próprios) e mantenha o mesmo número para a mesma voz. (Este áudio pode ser uma PARTE de uma reunião maior; transcreva só o que ouvir.)`;
 }
 function mxSummaryPromptText(lang) {
   const out = (lang === 'pt')
