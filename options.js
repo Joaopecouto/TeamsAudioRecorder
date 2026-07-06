@@ -361,9 +361,11 @@ function finishErr(r, kind, res) {
   loadRecordings();
 }
 $('clearRecs').addEventListener('click', async () => {
+  if (!confirm('Limpar TODO o histórico?\nApaga TODAS as gravações — áudio, transcrições e resumos. Não dá pra desfazer.')) return;
   chrome.storage.local.set({ recordings: [] });
   try { await mxIdbClear(); } catch (e) { /* ignore */ }
   openT.clear(); openS.clear();
+  detailTs = null; setWide(false); clearAudio();
   loadRecordings();
 });
 
