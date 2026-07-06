@@ -352,6 +352,46 @@ $('clearRecs').addEventListener('click', async () => {
   loadRecordings();
 });
 
+// ---------- importar MP3 do disco (sincroniza com os arquivos da pasta) ----------
+// A extensão NÃO lê a pasta sozinha (segurança do Chrome); o usuário seleciona os arquivos.
+// Re-vincula pelo NOME às gravações antigas cujo áudio sumiu do banco; o resto vira nova entrada.
+function audioDuration(blob) {
+  return new Promise((resolve) => {
+    const a = document.createElement('audio'); a.preload = 'metadata';
+    const url = URL.createObjectURL(blob);
+    a.onloadedmetadata = () => { const d = a.duration; try { URL.revokeObjectURL(url); } catch (e) { /* ignore */ } resolve(isFinite(d) ? Math.round(d) : 0); };
+    a.onerror = () => { try { URL.revokeObjectURL(url); } catch (e) { /* ignore */ } resolve(0); };
+    a.src = url;
+  });
+}
+async function importFiles(fileList) {
+  const files = Array.from(fileList || []).filter((f) => /\.mp3$/i.test(f.name) || f.type === 'audio/mpeg');
+  if (!files.length) { toast('Selecione arquivos .mp3'); return; }
+  toast('Importando…');
+  const st = await new Promise((res) => chrome.storage.local.get({ recordings: [] }, res));
+  const recs = st.recordings.slice();
+  let novas = 0, revinc = 0;
+  for (const file of files) {
+    let entry = recs.find((r) => r.name === file.name);
+    let ts;
+    if (entry) { ts = entry.ts; revinc++; }
+    else {
+      ts = file.lastModified || Date.now();
+      while (recs.some((r) => r.ts === ts)) ts++;
+      const durationSec = await audioDuration(file);
+      entry = { id: null, name: file.name, folder: '', sizeMB: +(file.size / (1024 * 1024)).toFixed(1), ts, durationSec, source: 'Importado', mic: false, chunkBytes: [], summary: '', transcript: '' };
+      recs.unshift(entry); novas++;
+    }
+    try { await mxIdbPut(ts, file); } catch (e) { toast('Erro ao guardar ' + file.name + ': ' + e.message); }
+  }
+  recs.sort((a, b) => b.ts - a.ts);
+  await new Promise((res) => chrome.storage.local.set({ recordings: recs.slice(0, 50) }, res));
+  loadRecordings();
+  toast('Importado ✓ — ' + revinc + ' re-vinculada(s), ' + novas + ' nova(s)');
+}
+$('importRecs').addEventListener('click', () => $('importInput').click());
+$('importInput').addEventListener('change', (e) => { importFiles(e.target.files); e.target.value = ''; });
+
 // ---------- abas ----------
 function showTab(which) {
   document.querySelectorAll('.tab').forEach((t) => t.classList.toggle('active', t.dataset.tab === which));

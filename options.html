@@ -67,6 +67,7 @@
 
     .rechead { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
     .rechead h3 { font-size: 16px; font-weight: 700; margin: 0; }
+    .rhacts { display: flex; gap: 16px; }
     .recitem { padding: 16px; border: 1px solid var(--border); border-radius: 8px; margin-bottom: 12px; }
     .recline { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
     .recname { font-size: 14px; color: var(--ink); word-break: break-all; }
@@ -313,8 +314,10 @@
       <section class="card">
         <div class="rechead">
           <h3>Suas gravações</h3>
-          <a id="clearRecs">Limpar histórico</a>
+          <div class="rhacts"><a id="importRecs">Importar MP3</a><a id="clearRecs">Limpar histórico</a></div>
         </div>
+        <p class="secsub" style="margin-top:-8px">Tem gravações antigas na pasta mas o áudio sumiu da lista? Clique em <b>Importar MP3</b> e selecione os arquivos — ele re-vincula pelo nome.</p>
+        <input type="file" id="importInput" accept="audio/mpeg,.mp3" multiple hidden>
         <div id="recList"><div class="empty">Nenhuma gravação ainda.</div></div>
       </section>
     </div>

@@ -126,7 +126,14 @@ async function mxSummarizeTranscript(key, model, lang, transcript) {
 // frame anotados na gravação). O arquivo salvo continua inteiro — isto só existe na hora de
 // mandar cada pedaço pro Gemini. Sem cortes (gravação curta) -> uma parte só (o arquivo todo).
 function mxChunksFromBlob(blob, cutBytes) {
-  const cuts = Array.isArray(cutBytes) ? cutBytes : [];
+  const cuts = Array.isArray(cutBytes) ? cutBytes.slice() : [];
+  // sem cortes e arquivo grande (ex.: MP3 importado da pasta): fatia por ~8 MB. É corte por
+  // BYTE (pode cair no meio de um frame), mas o Gemini reencaixa no próximo header — perde só
+  // alguns ms na junção. Mantém cada parte abaixo do limite inline (~14 MB).
+  if (!cuts.length && blob.size > 10 * 1024 * 1024) {
+    const step = 8 * 1024 * 1024;
+    for (let off = step; off < blob.size; off += step) cuts.push(off);
+  }
   const chunks = [];
   let prev = 0;
   for (const c of cuts) {
