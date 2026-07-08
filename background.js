@@ -7,7 +7,7 @@ const DEFAULTS = {
   subfolder: 'Reuniões', askWhereToSave: false,
   filenamePrefix: 'reuniao', dateFormat: 'AAAAMMDD-hhmm',
   showPill: true, pillCorner: 'bottom-right', domMeet: true, domTeams: true,
-  autoSummary: false, summaryLang: 'auto', geminiModel: 'gemini-2.5-flash', pillSound: true
+  autoSummary: false, summaryLang: 'auto', geminiModel: 'gemini-2.5-flash', pillSound: true, uiLang: 'auto'
 };
 
 let recording = false;
@@ -112,6 +112,7 @@ function openRecordings(ts) {
 
 // notificação ao salvar a gravação -> clicar abre aquela gravação na aba Gravações
 function notifyRecordingSaved(ts, name, durationSec) {
+  if (!chrome.notifications) { mxlog('notif: sem chrome.notifications (recarregue a extensão)'); return; }
   try {
     chrome.notifications.create('mxrec:' + ts, {
       type: 'basic',
@@ -119,8 +120,8 @@ function notifyRecordingSaved(ts, name, durationSec) {
       title: 'Reunião gravada ✓',
       message: name + ' · ' + fmtDur(durationSec) + '\nClique para ver a gravação e transcrever.',
       priority: 2
-    }, () => void chrome.runtime.lastError);
-  } catch (e) { /* ignore */ }
+    }, (id) => { mxlog('notif ' + (id || 'null') + ' err=' + ((chrome.runtime.lastError && chrome.runtime.lastError.message) || '-')); });
+  } catch (e) { mxlog('notif:throw ' + (e && e.message)); }
 }
 if (chrome.notifications && chrome.notifications.onClicked) {
   chrome.notifications.onClicked.addListener((id) => {
@@ -172,10 +173,11 @@ async function handleRecDone(m) {
         const blob = await mxIdbGet(m.ts);
         if (blob) {
           const chunks = mxChunksFromBlob(blob, m.chunkBytes);
-          const tr = await mxTranscribeSegments(local.geminiKey, cfg.geminiModel, cfg.summaryLang, chunks, null);
+          const lang = mxTargetLang(cfg.summaryLang, cfg.uiLang);
+          const tr = await mxTranscribeSegments(local.geminiKey, cfg.geminiModel, lang, chunks, null);
           if (tr.ok) {
             updateRec(m.ts, { transcript: tr.text });
-            const sm = await mxSummarizeTranscript(local.geminiKey, cfg.geminiModel, cfg.summaryLang, tr.text);
+            const sm = await mxSummarizeTranscript(local.geminiKey, cfg.geminiModel, lang, tr.text);
             if (sm.ok) updateRec(m.ts, { summary: sm.text });
             else chrome.runtime.sendMessage({ type: 'WARN', warn: 'Resumo automático: ' + sm.error }).catch(() => {});
           } else {

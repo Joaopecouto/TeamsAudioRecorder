@@ -21,12 +21,29 @@ async function mxBlobToBase64(blob) {
 
 // ----- prompts -----
 function mxTranscriptPrompt(lang) {
-  const out = (lang === 'pt')
-    ? 'Entregue a transcrição em português (traduza se a fala estiver em outro idioma).'
-    : 'Transcreva no idioma falado, sem traduzir.';
+  const out = (lang === 'pt') ? 'Entregue a transcrição em português (traduza se a fala estiver em outro idioma).'
+    : (lang === 'en') ? 'Provide the transcript in English (translate if spoken in another language).'
+      : 'Transcreva no idioma falado, sem traduzir.';
   return `Transcreva o ÁUDIO desta reunião o mais fiel possível. Identifique mudanças de interlocutor como "Pessoa 1:", "Pessoa 2:" quando der para distinguir. ${out} Não resuma — transcreva tudo o que foi dito.`;
 }
 function mxSummaryPromptText(lang) {
+  if (lang === 'en') {
+    return `You are a meeting-minutes assistant. The input is the TRANSCRIPT (possibly joined from several parts) of a meeting. Write the response in English. Produce markdown with exactly these sections:
+
+## Executive summary
+(3 to 5 lines)
+
+## Decisions
+
+## Action items
+(table: task | owner | due)
+
+## Open points / risks
+
+## Next steps
+
+Rules: do not invent anything not in the transcript; if owner/due wasn't stated, write "—".`;
+  }
   const out = (lang === 'pt')
     ? 'Escreva a resposta em português, mesmo que a reunião esteja em outro idioma.'
     : 'Escreva a resposta no MESMO idioma da transcrição.';
@@ -45,6 +62,13 @@ function mxSummaryPromptText(lang) {
 ## Próximos passos
 
 Regras: não invente nada que não esteja na transcrição; se responsável/prazo não foi dito, escreva "—".`;
+}
+// idioma-alvo: 'auto' = idioma natural da reunião; senão, o idioma da interface/navegador (pt|en)
+function mxTargetLang(summaryLang, uiLang) {
+  if (summaryLang === 'auto') return 'auto';
+  if (uiLang === 'en' || uiLang === 'pt') return uiLang;
+  const nav = ((typeof navigator !== 'undefined' && navigator.language) || 'pt').toLowerCase();
+  return nav.indexOf('en') === 0 ? 'en' : 'pt';
 }
 
 // ----- chamada base -----

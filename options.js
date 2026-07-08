@@ -3,7 +3,7 @@ const DEFAULTS = {
   subfolder: 'Reuniões', askWhereToSave: false,
   filenamePrefix: 'reuniao', dateFormat: 'AAAAMMDD-hhmm',
   showPill: true, pillCorner: 'bottom-right', domMeet: true, domTeams: true,
-  autoSummary: false, summaryLang: 'auto', geminiModel: 'gemini-2.5-flash', pillSound: true
+  autoSummary: false, summaryLang: 'auto', geminiModel: 'gemini-2.5-flash', pillSound: true, uiLang: 'auto'
 };
 const $ = (id) => document.getElementById(id);
 let settings = Object.assign({}, DEFAULTS);
@@ -323,10 +323,11 @@ async function doAction(r, kind) {
     return;
   }
   const chunks = mxChunksFromBlob(blob, r.chunkBytes);
+  const lang = mxTargetLang(settings.summaryLang, settings.uiLang);
   const onProg = (d, t) => setBusyLabel(r.ts, d >= t ? 'Finalizando…' : ('Transcrevendo parte ' + (d + 1) + '/' + t + '…'));
 
   if (kind === 'transcript') {
-    const res = await mxTranscribeSegments(geminiKey, settings.geminiModel, settings.summaryLang, chunks, onProg);
+    const res = await mxTranscribeSegments(geminiKey, settings.geminiModel, lang, chunks, onProg);
     busy.delete(r.ts); delete progLabel[r.ts];
     if (res.ok) { updateRec(r.ts, { transcript: res.text }); toast('Transcrição pronta ✓'); loadRecordings(); }
     else finishErr(r, 'transcript', res);
@@ -336,13 +337,13 @@ async function doAction(r, kind) {
   // resumo: sai do TEXTO da transcrição já juntada. Se ainda não há transcrição, transcreve antes.
   let transcript = r.transcript;
   if (!transcript) {
-    const tr = await mxTranscribeSegments(geminiKey, settings.geminiModel, settings.summaryLang, chunks, onProg);
+    const tr = await mxTranscribeSegments(geminiKey, settings.geminiModel, lang, chunks, onProg);
     if (!tr.ok) { busy.delete(r.ts); delete progLabel[r.ts]; finishErr(r, 'summary', tr); return; }
     transcript = tr.text;
     updateRec(r.ts, { transcript }); // aproveita e guarda a transcrição
   }
   setBusyLabel(r.ts, 'Resumindo…');
-  const sres = await mxSummarizeTranscript(geminiKey, settings.geminiModel, settings.summaryLang, transcript);
+  const sres = await mxSummarizeTranscript(geminiKey, settings.geminiModel, lang, transcript);
   busy.delete(r.ts); delete progLabel[r.ts];
   if (sres.ok) { updateRec(r.ts, { summary: sres.text }); toast('Resumo pronto ✓'); loadRecordings(); }
   else finishErr(r, 'summary', sres);
