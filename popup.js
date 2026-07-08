@@ -3,7 +3,7 @@ const DEFAULTS = {
   subfolder: 'Reuniões', askWhereToSave: false,
   filenamePrefix: 'reuniao', dateFormat: 'AAAAMMDD-hhmm',
   showPill: true, pillCorner: 'bottom-right', domMeet: true, domTeams: true,
-  autoSummary: false, summaryLang: 'auto', geminiModel: 'gemini-2.5-flash', pillSound: true
+  autoSummary: false, summaryLang: 'auto', geminiModel: 'gemini-2.5-flash', pillSound: true, uiLang: 'auto'
 };
 const $ = (id) => document.getElementById(id);
 let recording = false, startedAt = 0, tick = null, settings = Object.assign({}, DEFAULTS);
@@ -17,21 +17,21 @@ function stopTick() { if (tick) clearInterval(tick); tick = null; }
 function setUI() {
   const st = $('status'), btn = $('big');
   if (recording) {
-    st.classList.add('rec'); $('statusTxt').textContent = 'Gravando…';
-    btn.classList.add('rec'); $('bigLabel').textContent = 'Parar e salvar'; startTick();
+    st.classList.add('rec'); $('statusTxt').textContent = t('status_rec');
+    btn.classList.add('rec'); $('bigLabel').textContent = t('btn_stop'); startTick();
   } else {
-    st.classList.remove('rec'); $('statusTxt').textContent = 'Pronto para gravar';
-    $('time').textContent = ''; btn.classList.remove('rec'); $('bigLabel').textContent = 'Iniciar gravação'; stopTick();
+    st.classList.remove('rec'); $('statusTxt').textContent = t('status_ready');
+    $('time').textContent = ''; btn.classList.remove('rec'); $('bigLabel').textContent = t('btn_start'); stopTick();
   }
 }
 
 function reflect() {
   $('micSwitch').checked = !!settings.micEnabled;
   $('dest').textContent = settings.askWhereToSave
-    ? 'Salvar em: você escolhe'
-    : 'Salvar em: Downloads' + (settings.subfolder ? '/' + settings.subfolder : '');
+    ? t('save_ask')
+    : t('save_downloads') + (settings.subfolder ? '/' + settings.subfolder : '');
 }
-function load(cb) { chrome.storage.sync.get(DEFAULTS, (s) => { settings = s; reflect(); cb && cb(); }); }
+function load(cb) { chrome.storage.sync.get(DEFAULTS, (s) => { settings = s; mxSetLang(settings.uiLang); mxApplyI18n(document); reflect(); cb && cb(); }); }
 
 // abre a página de opções (reaproveita a aba se já estiver aberta)
 function openPage(hash) {
@@ -57,16 +57,16 @@ async function requestMic() {
 $('micSwitch').addEventListener('change', async () => {
   if ($('micSwitch').checked) {
     settings.micEnabled = true; chrome.storage.sync.set({ micEnabled: true });
-    $('micHint').textContent = 'Pedindo permissão do microfone…';
+    $('micHint').textContent = t('mic_asking');
     const ok = await requestMic();
-    if (ok) $('micHint').textContent = 'Microfone autorizado ✓ — entra junto na gravação.';
+    if (ok) $('micHint').textContent = t('mic_ok');
     else {
       $('micSwitch').checked = false; settings.micEnabled = false; chrome.storage.sync.set({ micEnabled: false });
-      $('micHint').textContent = 'Permissão negada. Ligue de novo para tentar.';
+      $('micHint').textContent = t('mic_denied');
     }
   } else {
     settings.micEnabled = false; chrome.storage.sync.set({ micEnabled: false });
-    $('micHint').textContent = 'Só a fonte principal será gravada.';
+    $('micHint').textContent = t('mic_hint_off');
   }
 });
 
@@ -74,28 +74,28 @@ $('micSwitch').addEventListener('change', async () => {
 function onStartRes(res) {
   if (res && res.ok) {
     // só o "recebi" — o "gravando" de fato chega por RECORDING_STARTED
-    $('hint').textContent = 'Escolha a tela/aba e marque "Compartilhar áudio"…';
+    $('hint').textContent = t('hint_choose');
   } else {
-    $('hint').textContent = 'Erro: ' + ((res && res.error) || 'falha ao iniciar');
+    $('hint').textContent = t('err_prefix') + ((res && res.error) || t('start_err'));
   }
 }
 $('big').addEventListener('click', async () => {
   if (recording) {
-    $('hint').textContent = 'Convertendo para MP3…';
+    $('hint').textContent = t('hint_converting');
     chrome.runtime.sendMessage({ type: 'STOP' }, () => {});
     recording = false; setUI();
     return;
   }
   // modo único: áudio do sistema. Ao gravar, o seletor abre (tela/aba) + "Compartilhar áudio".
-  $('hint').textContent = 'Escolha a tela/aba e marque "Compartilhar áudio"…';
+  $('hint').textContent = t('hint_choose');
   chrome.runtime.sendMessage({ type: 'START', source: 'system', bitrate: settings.bitrate }, onStartRes);
 });
 
 chrome.runtime.onMessage.addListener((msg) => {
-  if (msg.type === 'RECORDING_STARTED') { recording = true; startedAt = msg.startedAt || Date.now(); setUI(); $('hint').textContent = 'Gravando… pode fechar este menu.'; }
-  if (msg.type === 'SAVED') $('hint').textContent = 'MP3 salvo ✓ (' + msg.size + ') — abra "Ver gravações" para transcrever/resumir.';
+  if (msg.type === 'RECORDING_STARTED') { recording = true; startedAt = msg.startedAt || Date.now(); setUI(); $('hint').textContent = t('hint_recording'); }
+  if (msg.type === 'SAVED') $('hint').textContent = t('saved_ok', msg.size);
   if (msg.type === 'WARN') $('hint').textContent = msg.warn;
-  if (msg.type === 'ERROR') { recording = false; setUI(); $('hint').textContent = 'Erro: ' + msg.error; }
+  if (msg.type === 'ERROR') { recording = false; setUI(); $('hint').textContent = t('err_prefix') + msg.error; }
 });
 chrome.storage.onChanged.addListener((changes, area) => {
   if (area !== 'sync') return;

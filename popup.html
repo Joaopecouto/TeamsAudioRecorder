@@ -48,27 +48,28 @@
 </head>
 <body>
   <div class="head">
-    <div class="brand"><span class="ic"><i></i></span> Gravador de reunião</div>
-    <button class="gear" id="gear" title="Ajustes e gravações">&#9881;</button>
+    <div class="brand"><span class="ic"><i></i></span> <span data-i18n="app_name">Gravador de reunião</span></div>
+    <button class="gear" id="gear" data-i18n-title="popup_gear_title" title="Ajustes e gravações">&#9881;</button>
   </div>
   <div class="body">
     <div class="status" id="status">
       <span class="dot"></span>
-      <span class="txt" id="statusTxt">Pronto para gravar</span>
+      <span class="txt" id="statusTxt" data-i18n="status_ready">Pronto para gravar</span>
       <span class="time" id="time"></span>
     </div>
-    <button class="big" id="big"><span class="rdot"></span><span id="bigLabel">Iniciar gravação</span></button>
+    <button class="big" id="big"><span class="rdot"></span><span id="bigLabel" data-i18n="btn_start">Iniciar gravação</span></button>
     <div class="microw">
       <span class="mlabel">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="2" width="6" height="11" rx="3"></rect><path d="M5 10a7 7 0 0 0 14 0"></path><line x1="12" y1="19" x2="12" y2="22"></line></svg>
-        Incluir meu microfone
+        <span data-i18n="incl_mic">Incluir meu microfone</span>
       </span>
       <label class="switch" style="margin-left:auto"><input type="checkbox" id="micSwitch"><span class="track"></span></label>
     </div>
-    <div class="micHint" id="micHint">Só a fonte principal será gravada.</div>
-    <div class="meta"><span id="dest">Salvar em: Downloads</span><a id="openRec">Ver gravações</a></div>
-    <div class="hint" id="hint">Abra o Teams ou o Meet nesta aba e clique em iniciar.</div>
+    <div class="micHint" id="micHint" data-i18n="mic_hint_off">Só a fonte principal será gravada.</div>
+    <div class="meta"><span id="dest" data-i18n="save_downloads">Salvar em: Downloads</span><a id="openRec" data-i18n="see_recordings">Ver gravações</a></div>
+    <div class="hint" id="hint" data-i18n="hint_default">Abra o Teams ou o Meet nesta aba e clique em iniciar.</div>
   </div>
+  <script src="i18n.js"></script>
   <script src="popup.js"></script>
 </body>
 </html>
