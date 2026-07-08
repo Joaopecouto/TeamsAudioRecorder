@@ -92,6 +92,45 @@ function updateRec(ts, patch) {
 }
 
 // Recebe o resultado do offscreen: baixa o MP3 + grava metadados + (opcional) resumo automático.
+// duração amigável mm:ss
+function fmtDur(s) { s = Math.max(0, Math.round(s || 0)); return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0'); }
+
+// abre a aba Gravações (reaproveita a página se já aberta); com ts -> abre aquela gravação
+function openRecordings(ts) {
+  const url = chrome.runtime.getURL('options.html');
+  const hash = ts ? ('#rec=' + ts) : '#rec';
+  chrome.tabs.query({}, (tabs) => {
+    const ex = tabs.find((t) => t.url && t.url.indexOf(url) === 0);
+    if (ex) {
+      chrome.tabs.update(ex.id, { active: true, url: url + hash });
+      if (ex.windowId != null) chrome.windows.update(ex.windowId, { focused: true });
+    } else {
+      chrome.tabs.create({ url: url + hash });
+    }
+  });
+}
+
+// notificação ao salvar a gravação -> clicar abre aquela gravação na aba Gravações
+function notifyRecordingSaved(ts, name, durationSec) {
+  try {
+    chrome.notifications.create('mxrec:' + ts, {
+      type: 'basic',
+      iconUrl: chrome.runtime.getURL('icons/icon128.png'),
+      title: 'Reunião gravada ✓',
+      message: name + ' · ' + fmtDur(durationSec) + '\nClique para ver a gravação e transcrever.',
+      priority: 2
+    }, () => void chrome.runtime.lastError);
+  } catch (e) { /* ignore */ }
+}
+if (chrome.notifications && chrome.notifications.onClicked) {
+  chrome.notifications.onClicked.addListener((id) => {
+    if (id && id.indexOf('mxrec:') === 0) {
+      openRecordings(Number(id.slice(6)) || null);
+      try { chrome.notifications.clear(id); } catch (e) { /* ignore */ }
+    }
+  });
+}
+
 async function handleRecDone(m) {
   const cfg = await chrome.storage.sync.get(DEFAULTS);
   const sub = sanitize(cfg.subfolder);
@@ -119,6 +158,7 @@ async function handleRecDone(m) {
     });
   }
   chrome.runtime.sendMessage({ type: 'SAVED', size: m.sizeMB + ' MB' }).catch(() => {});
+  notifyRecordingSaved(m.ts, base, m.durationSec);
 
   // resumo automático (só se ligado e com chave): transcreve as partes -> junta -> resume do
   // TEXTO. Roda no service worker com keepalive; para reuniões MUITO longas pode não terminar

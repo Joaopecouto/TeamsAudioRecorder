@@ -419,6 +419,13 @@ function showTab(which) {
 }
 document.querySelectorAll('.tab').forEach((t) => t.addEventListener('click', () => showTab(t.dataset.tab)));
 
+// se a página já estiver aberta e a notificação mudar o hash (#rec=<ts>), reage sem recarregar
+window.addEventListener('hashchange', () => {
+  const m = (location.hash || '').match(/#rec=(\d+)/);
+  if (m) { showTab('rec'); openDetail(Number(m[1])); }
+  else if ((location.hash || '').indexOf('#rec') === 0) showTab('rec');
+});
+
 chrome.storage.onChanged.addListener((changes, area) => {
   if (area === 'local' && changes.recordings) render(changes.recordings.newValue || []);
 });
@@ -430,6 +437,11 @@ chrome.storage.sync.get(DEFAULTS, (s) => {
     geminiKey = k; hasKey = !!k; $('geminiKey').value = k;
     updateNoKeyHint(); loadRecordings();
   });
-  if (location.hash === '#rec') showTab('rec');
-  if (location.hash === '#setup') { $('setupBanner').classList.remove('hidden'); setMic(true); }
+  const hash = location.hash || '';
+  if (hash.indexOf('#rec') === 0) {
+    showTab('rec');
+    const m = hash.match(/#rec=(\d+)/);
+    if (m) openDetail(Number(m[1]));
+  }
+  if (hash === '#setup') { $('setupBanner').classList.remove('hidden'); setMic(true); }
 });
