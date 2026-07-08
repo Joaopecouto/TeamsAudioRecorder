@@ -19,9 +19,9 @@ function setBusyLabel(ts, text) { progLabel[ts] = text; loadRecordings(); }
 // ---------- toast ----------
 let toastTimer = null;
 function toast(text) {
-  const t = $('saved'); t.textContent = text || 'Salvo ✓';
-  t.classList.add('show'); clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => t.classList.remove('show'), 1600);
+  const el = $('saved'); el.textContent = text || mxt('saved_toast');
+  el.classList.add('show'); clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.classList.remove('show'), 1600);
 }
 
 // ---------- settings ----------
@@ -30,6 +30,7 @@ function updatePreview() {
   $('fmtPreview').textContent = (settings.subfolder ? settings.subfolder + '/' : '') + name;
 }
 function reflect() {
+  $('uiLang').value = settings.uiLang || 'auto';
   $('micSwitch').checked = !!settings.micEnabled;
   $('micGain').value = String(settings.micGain || 2);
   $('bitrate').value = String(settings.bitrate);
@@ -69,6 +70,12 @@ function saveAll() {
 
 ['bitrate', 'geminiModel', 'summaryLang', 'autoSummary', 'subfolder', 'askWhereToSave', 'filenamePrefix', 'dateFormat', 'showPill', 'pillSound', 'pillCorner', 'domTeams', 'domMeet']
   .forEach((id) => { const el = $(id); el.addEventListener('change', saveAll); el.addEventListener('input', saveAll); });
+$('uiLang').addEventListener('change', () => {
+  settings.uiLang = $('uiLang').value;
+  chrome.storage.sync.set({ uiLang: settings.uiLang });
+  mxSetLang(settings.uiLang); mxApplyI18n(document);
+  updatePreview(); loadRecordings();
+});
 document.querySelectorAll('.chip').forEach((c) => c.addEventListener('click', () => { $('dateFormat').value = c.dataset.fmt; saveAll(); }));
 
 // ---------- chave do Gemini (local) ----------
@@ -102,7 +109,7 @@ async function listMics() {
     const opt0 = document.createElement('option'); opt0.value = ''; opt0.textContent = 'Microfone padrão do sistema'; sel.appendChild(opt0);
     mics.forEach((m, i) => { const o = document.createElement('option'); o.value = m.deviceId; o.textContent = m.label || ('Microfone ' + (i + 1)); sel.appendChild(o); });
     sel.value = settings.micDeviceId || '';
-    $('micNote').textContent = mics.some((m) => m.label) ? 'Aparelho usado quando o microfone está ligado.' : 'Autorize o microfone para ver os nomes dos aparelhos.';
+    $('micNote').textContent = mics.some((m) => m.label) ? mxt('mic_note_used') : mxt('mic_note_auth');
   } catch (e) { /* ignore */ }
 }
 async function setMic(on) {
@@ -133,13 +140,13 @@ function updateRec(ts, patch) {
 async function refreshAvail() { try { availTs = new Set(await mxIdbKeys()); } catch (e) { availTs = new Set(); } }
 function loadRecordings() { refreshAvail().then(() => chrome.storage.local.get({ recordings: [] }, ({ recordings }) => render(recordings))); }
 async function deleteRec(ts, name) {
-  if (!confirm('Excluir "' + (name || 'esta gravação') + '"?\nApaga o áudio, a transcrição e o resumo. Não dá pra desfazer.')) return;
+  if (!confirm(mxt('confirm_delete', name || ''))) return;
   const st = await new Promise((res) => chrome.storage.local.get({ recordings: [] }, res));
   await new Promise((res) => chrome.storage.local.set({ recordings: st.recordings.filter((r) => r.ts !== ts) }, res));
   try { await mxIdbDelete(ts); } catch (e) { /* ignore */ }
   if (detailTs === ts) { detailTs = null; setWide(false); clearAudio(); }
   loadRecordings();
-  toast('Gravação excluída');
+  toast(mxt('t_deleted'));
 }
 
 let detailTs = null; // ts da gravação aberta em detalhe; null = mostrando a lista
@@ -162,19 +169,19 @@ function render(list) {
 // ---- lista: cards clicáveis, nome/meta em 1 linha (nunca quebra vertical) ----
 function renderList(list) {
   const c = $('recList'); c.innerHTML = '';
-  if (!list.length) { c.innerHTML = '<div class="empty">Nenhuma gravação ainda.</div>'; return; }
+  if (!list.length) { c.innerHTML = '<div class="empty">' + mxt('no_recordings') + '</div>'; return; }
   list.forEach((r) => {
     const card = document.createElement('div'); card.className = 'reccard'; card.setAttribute('role', 'button'); card.tabIndex = 0;
     const info = document.createElement('div'); info.className = 'recinfo';
     info.innerHTML = '<div class="recname">' + esc(r.name) + '</div><div class="recmeta">' +
       whenStr(r.ts) + ' · ' + mmss(r.durationSec) + ' · ' + r.sizeMB + ' MB · ' + esc(r.source) + (r.mic ? ' + mic' : '') + '</div>';
     const st = document.createElement('div'); st.className = 'recstatus';
-    if (busyT.has(r.ts) || busyS.has(r.ts)) { const t = document.createElement('span'); t.className = 'tag busy'; t.textContent = 'Processando…'; st.appendChild(t); }
+    if (busyT.has(r.ts) || busyS.has(r.ts)) { const t = document.createElement('span'); t.className = 'tag busy'; t.textContent = mxt('st_processing'); st.appendChild(t); }
     else {
-      if (r.transcript) { const t = document.createElement('span'); t.className = 'tag on'; t.textContent = 'Transcrita'; st.appendChild(t); }
-      if (r.summary) { const t = document.createElement('span'); t.className = 'tag on'; t.textContent = 'Resumo'; st.appendChild(t); }
+      if (r.transcript) { const t = document.createElement('span'); t.className = 'tag on'; t.textContent = mxt('st_transcribed'); st.appendChild(t); }
+      if (r.summary) { const t = document.createElement('span'); t.className = 'tag on'; t.textContent = mxt('st_summary'); st.appendChild(t); }
     }
-    const del = document.createElement('button'); del.className = 'recdel'; del.title = 'Excluir gravação';
+    const del = document.createElement('button'); del.className = 'recdel'; del.title = mxt('del_rec_title');
     del.innerHTML = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>';
     del.addEventListener('click', (e) => { e.stopPropagation(); deleteRec(r.ts, r.name); });
     st.appendChild(del);
@@ -219,21 +226,21 @@ function detHeader(r) {
 
   const row = document.createElement('div'); row.className = 'dplayer';
   if (availTs.has(r.ts)) row.appendChild(getAudio(r));
-  else { const d = document.createElement('div'); d.className = 'dempty'; d.textContent = 'Áudio não está mais salvo (guardamos as 12 gravações mais recentes).'; row.appendChild(d); }
+  else { const d = document.createElement('div'); d.className = 'dempty'; d.textContent = mxt('t_audio_gone'); row.appendChild(d); }
 
   const acts = document.createElement('div'); acts.className = 'detacts';
-  const open = mkBtn('Abrir'); if (r.id == null) open.disabled = true; open.addEventListener('click', () => { try { chrome.downloads.open(r.id); } catch (e) { /* ignore */ } });
-  const show = mkBtn('Pasta'); if (r.id == null) show.disabled = true; show.addEventListener('click', () => { try { chrome.downloads.show(r.id); } catch (e) { /* ignore */ } });
-  const dl = mkBtn('Baixar MP3'); if (!availTs.has(r.ts)) { dl.disabled = true; dl.title = 'Áudio não está mais salvo'; }
+  const open = mkBtn(mxt('d_open')); if (r.id == null) open.disabled = true; open.addEventListener('click', () => { try { chrome.downloads.open(r.id); } catch (e) { /* ignore */ } });
+  const show = mkBtn(mxt('d_folder')); if (r.id == null) show.disabled = true; show.addEventListener('click', () => { try { chrome.downloads.show(r.id); } catch (e) { /* ignore */ } });
+  const dl = mkBtn(mxt('d_download_mp3')); if (!availTs.has(r.ts)) { dl.disabled = true; dl.title = mxt('audio_gone'); }
   dl.addEventListener('click', async () => {
     try {
       const b = await mxIdbGet(r.ts);
-      if (!b) { toast('Áudio não está mais salvo.'); return; }
+      if (!b) { toast(mxt('audio_gone')); return; }
       const u = URL.createObjectURL(b);
       chrome.downloads.download({ url: u, filename: (r.folder ? r.folder + '/' : '') + r.name, saveAs: false });
-    } catch (e) { toast('Erro ao baixar: ' + e.message); }
+    } catch (e) { toast(mxt('t_download_err') + e.message); }
   });
-  const del = mkBtn('Excluir'); del.classList.add('danger'); del.addEventListener('click', () => deleteRec(r.ts, r.name));
+  const del = mkBtn(mxt('d_delete')); del.classList.add('danger'); del.addEventListener('click', () => deleteRec(r.ts, r.name));
   acts.appendChild(open); acts.appendChild(show); acts.appendChild(dl); acts.appendChild(del);
   row.appendChild(acts);
   head.appendChild(row);
@@ -249,16 +256,16 @@ function tabPane(r, kind) {
   if ((isT ? busyT : busyS).has(r.ts)) {
     const p = document.createElement('div'); p.className = 'prog';
     const sp = document.createElement('span'); sp.className = 'spinner';
-    const tx = document.createElement('span'); tx.textContent = progLabel[r.ts] || (isT ? 'Transcrevendo…' : 'Resumindo…');
+    const tx = document.createElement('span'); tx.textContent = progLabel[r.ts] || (isT ? mxt('prog_transcribing') : mxt('prog_summarizing'));
     p.appendChild(sp); p.appendChild(tx); pane.appendChild(p);
     return pane;
   }
   if (!text) {
     const d = document.createElement('div'); d.className = 'dempty';
-    d.textContent = isT ? 'Ainda não transcrita. A extensão manda o áudio ao Gemini em partes e junta o texto.' : 'Ainda sem resumo. Sai da transcrição: resumo executivo, decisões, itens de ação e próximos passos.';
+    d.textContent = isT ? mxt('empty_transcript') : mxt('empty_summary');
     pane.appendChild(d);
-    const btn = mkBtn(isT ? 'Transcrever' : 'Criar resumo'); btn.classList.add('fill');
-    if (!availTs.has(r.ts)) { btn.disabled = true; btn.classList.remove('fill'); btn.title = 'Áudio não está mais salvo'; }
+    const btn = mkBtn(isT ? mxt('btn_transcribe') : mxt('btn_create_summary')); btn.classList.add('fill');
+    if (!availTs.has(r.ts)) { btn.disabled = true; btn.classList.remove('fill'); btn.title = mxt('audio_gone'); }
     btn.addEventListener('click', () => doAction(r, kind));
     pane.appendChild(btn);
     return pane;
@@ -269,9 +276,9 @@ function tabPane(r, kind) {
 
   const a = document.createElement('div'); a.className = 'dacts';
   const copyText = text;
-  const cp = mkBtn('Copiar'); cp.addEventListener('click', () => { navigator.clipboard.writeText(copyText); cp.textContent = 'Copiado ✓'; setTimeout(() => (cp.textContent = 'Copiar'), 1200); });
-  const bd = mkBtn('Baixar'); bd.addEventListener('click', () => dlText(r, kind, copyText));
-  const re = mkBtn('Refazer'); if (!availTs.has(r.ts)) { re.disabled = true; re.title = 'Áudio não está mais salvo'; } re.addEventListener('click', () => doAction(r, kind));
+  const cp = mkBtn(mxt('d_copy')); cp.addEventListener('click', () => { navigator.clipboard.writeText(copyText); cp.textContent = mxt('d_copied'); setTimeout(() => (cp.textContent = mxt('d_copy')), 1200); });
+  const bd = mkBtn(mxt('d_download')); bd.addEventListener('click', () => dlText(r, kind, copyText));
+  const re = mkBtn(mxt('d_redo')); if (!availTs.has(r.ts)) { re.disabled = true; re.title = mxt('audio_gone'); } re.addEventListener('click', () => doAction(r, kind));
   a.appendChild(cp); a.appendChild(bd); a.appendChild(re);
   pane.appendChild(a);
   return pane;
@@ -286,8 +293,8 @@ function detRight(r) {
     b.addEventListener('click', () => { detailTab = key; loadRecordings(); });
     return b;
   };
-  tabs.appendChild(mkTab('transcript', 'Transcrição'));
-  tabs.appendChild(mkTab('summary', 'Resumo'));
+  tabs.appendChild(mkTab('transcript', mxt('tab_transcript')));
+  tabs.appendChild(mkTab('summary', mxt('tab_summary')));
   right.appendChild(tabs);
   right.appendChild(tabPane(r, detailTab));
   return right;
@@ -297,7 +304,7 @@ function detRight(r) {
 function renderDetail(r) {
   const c = $('recList'); c.innerHTML = '';
   const back = document.createElement('button'); back.className = 'back';
-  back.textContent = '← Voltar para gravações';
+  back.textContent = mxt('back_to_recordings');
   back.addEventListener('click', backToList);
   c.appendChild(back);
 
@@ -307,29 +314,29 @@ function renderDetail(r) {
 async function doAction(r, kind) {
   // Edge case principal: tentar transcrever/resumir sem chave -> leva pro campo da chave.
   if (!hasKey) {
-    toast('Cole a chave do Gemini em Ajustes (te levei pra lá).');
+    toast(mxt('t_no_key'));
     showTab('cap'); highlightKey();
     return;
   }
   const busy = kind === 'transcript' ? busyT : busyS;
-  busy.add(r.ts); setBusyLabel(r.ts, kind === 'transcript' ? 'Transcrevendo…' : 'Resumindo…');
+  busy.add(r.ts); setBusyLabel(r.ts, kind === 'transcript' ? mxt('prog_transcribing') : mxt('prog_summarizing'));
 
   // pega o ARQUIVO INTEIRO e fatia em partes SÓ para transcrever (o arquivo salvo fica intacto)
   let blob = null;
   try { blob = await mxIdbGet(r.ts); } catch (e) { /* ignore */ }
   if (!blob) {
     busy.delete(r.ts); delete progLabel[r.ts];
-    toast('Áudio não está mais salvo (guardamos as 12 gravações mais recentes).'); loadRecordings();
+    toast(mxt('t_audio_gone')); loadRecordings();
     return;
   }
   const chunks = mxChunksFromBlob(blob, r.chunkBytes);
   const lang = mxTargetLang(settings.summaryLang, settings.uiLang);
-  const onProg = (d, t) => setBusyLabel(r.ts, d >= t ? 'Finalizando…' : ('Transcrevendo parte ' + (d + 1) + '/' + t + '…'));
+  const onProg = (d, t) => setBusyLabel(r.ts, d >= t ? mxt('prog_finishing') : mxt('prog_part', d + 1, t));
 
   if (kind === 'transcript') {
     const res = await mxTranscribeSegments(geminiKey, settings.geminiModel, lang, chunks, onProg);
     busy.delete(r.ts); delete progLabel[r.ts];
-    if (res.ok) { updateRec(r.ts, { transcript: res.text }); toast('Transcrição pronta ✓'); loadRecordings(); }
+    if (res.ok) { updateRec(r.ts, { transcript: res.text }); toast(mxt('t_transcript_ready')); loadRecordings(); }
     else finishErr(r, 'transcript', res);
     return;
   }
@@ -342,10 +349,10 @@ async function doAction(r, kind) {
     transcript = tr.text;
     updateRec(r.ts, { transcript }); // aproveita e guarda a transcrição
   }
-  setBusyLabel(r.ts, 'Resumindo…');
+  setBusyLabel(r.ts, mxt('prog_summarizing'));
   const sres = await mxSummarizeTranscript(geminiKey, settings.geminiModel, lang, transcript);
   busy.delete(r.ts); delete progLabel[r.ts];
-  if (sres.ok) { updateRec(r.ts, { summary: sres.text }); toast('Resumo pronto ✓'); loadRecordings(); }
+  if (sres.ok) { updateRec(r.ts, { summary: sres.text }); toast(mxt('t_summary_ready')); loadRecordings(); }
   else finishErr(r, 'summary', sres);
 }
 
@@ -353,16 +360,16 @@ async function doAction(r, kind) {
 function finishErr(r, kind, res) {
   const busy = kind === 'transcript' ? busyT : busyS;
   if (/\b429\b/.test(res.error || '')) {
-    busy.add(r.ts); progLabel[r.ts] = 'Cota esgotada — aguarde';
-    toast('Cota do Gemini esgotada. Espere um pouco e tente de novo.');
+    busy.add(r.ts); progLabel[r.ts] = mxt('t_quota_wait');
+    toast(mxt('t_quota'));
     setTimeout(() => { busy.delete(r.ts); delete progLabel[r.ts]; loadRecordings(); }, 30000);
   } else {
-    toast((kind === 'transcript' ? 'Transcrição' : 'Resumo') + ': ' + res.error);
+    toast(mxt(kind === 'transcript' ? 't_transcript' : 't_summary') + ': ' + res.error);
   }
   loadRecordings();
 }
 $('clearRecs').addEventListener('click', async () => {
-  if (!confirm('Limpar TODO o histórico?\nApaga TODAS as gravações — áudio, transcrições e resumos. Não dá pra desfazer.')) return;
+  if (!confirm(mxt('confirm_clear'))) return;
   chrome.storage.local.set({ recordings: [] });
   try { await mxIdbClear(); } catch (e) { /* ignore */ }
   openT.clear(); openS.clear();
@@ -384,8 +391,8 @@ function audioDuration(blob) {
 }
 async function importFiles(fileList) {
   const files = Array.from(fileList || []).filter((f) => /\.mp3$/i.test(f.name) || f.type === 'audio/mpeg');
-  if (!files.length) { toast('Selecione arquivos .mp3'); return; }
-  toast('Importando…');
+  if (!files.length) { toast(mxt('t_import_pick')); return; }
+  toast(mxt('t_importing'));
   const st = await new Promise((res) => chrome.storage.local.get({ recordings: [] }, res));
   const recs = st.recordings.slice();
   let novas = 0, revinc = 0;
@@ -397,7 +404,7 @@ async function importFiles(fileList) {
       ts = file.lastModified || Date.now();
       while (recs.some((r) => r.ts === ts)) ts++;
       const durationSec = await audioDuration(file);
-      entry = { id: null, name: file.name, folder: '', sizeMB: +(file.size / (1024 * 1024)).toFixed(1), ts, durationSec, source: 'Importado', mic: false, chunkBytes: [], summary: '', transcript: '' };
+      entry = { id: null, name: file.name, folder: '', sizeMB: +(file.size / (1024 * 1024)).toFixed(1), ts, durationSec, source: mxt('src_imported'), mic: false, chunkBytes: [], summary: '', transcript: '' };
       recs.unshift(entry); novas++;
     }
     try { await mxIdbPut(ts, file); } catch (e) { toast('Erro ao guardar ' + file.name + ': ' + e.message); }
@@ -405,7 +412,7 @@ async function importFiles(fileList) {
   recs.sort((a, b) => b.ts - a.ts);
   await new Promise((res) => chrome.storage.local.set({ recordings: recs.slice(0, 50) }, res));
   loadRecordings();
-  toast('Importado ✓ — ' + revinc + ' re-vinculada(s), ' + novas + ' nova(s)');
+  toast(mxt('t_import_done', revinc, novas));
 }
 $('importRecs').addEventListener('click', () => $('importInput').click());
 $('importInput').addEventListener('change', (e) => { importFiles(e.target.files); e.target.value = ''; });
@@ -433,7 +440,7 @@ chrome.storage.onChanged.addListener((changes, area) => {
 
 // ---------- init ----------
 chrome.storage.sync.get(DEFAULTS, (s) => {
-  settings = s; reflect();
+  settings = s; mxSetLang(settings.uiLang); mxApplyI18n(document); reflect();
   chrome.storage.local.get({ geminiKey: '' }, ({ geminiKey: k }) => {
     geminiKey = k; hasKey = !!k; $('geminiKey').value = k;
     updateNoKeyHint(); loadRecordings();

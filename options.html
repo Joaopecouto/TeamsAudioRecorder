@@ -184,84 +184,95 @@
 </head>
 <body>
   <div class="wrap">
-    <div class="brand"><span class="ic"><i></i></span><h1>Gravador de reunião</h1></div>
+    <div class="brand"><span class="ic"><i></i></span><h1 data-i18n="app_name">Gravador de reunião</h1></div>
     <div class="tabs">
-      <button class="tab active" data-tab="cap">Ajustes</button>
-      <button class="tab" data-tab="rec">Gravações</button>
+      <button class="tab active" data-tab="cap" data-i18n="tab_settings">Ajustes</button>
+      <button class="tab" data-tab="rec" data-i18n="tab_recordings">Gravações</button>
     </div>
 
     <!-- AJUSTES -->
     <div class="pane" id="pane-cap">
 
+      <section class="card">
+        <div class="row" style="border-bottom:0; padding:0">
+          <h3 data-i18n="lang_title">Idioma / Language</h3>
+          <select id="uiLang">
+            <option value="auto" data-i18n="lang_auto">Automático (navegador)</option>
+            <option value="pt">Português</option>
+            <option value="en">English</option>
+          </select>
+        </div>
+      </section>
+
       <div class="banner hidden" id="setupBanner">
-        <div class="btxt"><b>Bem-vindo!</b> Para gravar a reunião com a sua voz, autorize o microfone agora. Depois, cole a chave do Gemini abaixo para transcrever e resumir.</div>
-        <button class="act" id="grantMic">Permitir microfone</button>
+        <div class="btxt" data-i18n-html="setup_welcome"><b>Bem-vindo!</b> Para gravar a reunião com a sua voz, autorize o microfone agora. Depois, cole a chave do Gemini abaixo para transcrever e resumir.</div>
+        <button class="act" id="grantMic" data-i18n="grant_mic">Permitir microfone</button>
       </div>
 
       <section class="card">
-        <h2 class="sec">Captura</h2>
-        <p class="secsub">Grava o áudio do SISTEMA (qualquer app). Ao iniciar, escolha a tela ou aba no seletor do Chrome e marque "Compartilhar áudio".</p>
+        <h2 class="sec" data-i18n="sec_capture">Captura</h2>
+        <p class="secsub" data-i18n="cap_sub">Grava o áudio do SISTEMA (qualquer app). Ao iniciar, escolha a tela ou aba no seletor do Chrome e marque "Compartilhar áudio".</p>
         <div class="row toggle">
-          <div><h3>Incluir meu microfone</h3><p>Mixa sua voz junto com a reunião. Use fones para evitar eco.</p></div>
+          <div><h3 data-i18n="incl_mic">Incluir meu microfone</h3><p data-i18n="mic_mix_hint">Mixa sua voz junto com a reunião. Use fones para evitar eco.</p></div>
           <label class="switch"><input type="checkbox" id="micSwitch"><span class="track"></span></label>
         </div>
         <div class="row">
-          <h3>Aparelho do microfone</h3>
-          <select id="micDevice"><option value="">Microfone padrão do sistema</option></select>
-          <p id="micNote" class="sub">Autorize o microfone para ver os nomes dos aparelhos.</p>
+          <h3 data-i18n="mic_device">Aparelho do microfone</h3>
+          <select id="micDevice"><option value="" data-i18n="mic_default">Microfone padrão do sistema</option></select>
+          <p id="micNote" class="sub" data-i18n="mic_note_auth">Autorize o microfone para ver os nomes dos aparelhos.</p>
         </div>
         <div class="row">
-          <h3>Volume do microfone</h3>
-          <p>O microfone costuma sair mais baixo que o áudio da reunião — aumente se a sua voz ficar fraca.</p>
+          <h3 data-i18n="mic_volume">Volume do microfone</h3>
+          <p data-i18n="mic_vol_hint">O microfone costuma sair mais baixo que o áudio da reunião — aumente se a sua voz ficar fraca.</p>
           <select id="micGain">
-            <option value="1">Normal (1×)</option>
-            <option value="2">Alto (2×)</option>
-            <option value="3">Muito alto (3×)</option>
+            <option value="1" data-i18n="mic_vol_normal">Normal (1×)</option>
+            <option value="2" data-i18n="mic_vol_high">Alto (2×)</option>
+            <option value="3" data-i18n="mic_vol_vhigh">Muito alto (3×)</option>
           </select>
         </div>
       </section>
 
       <section class="card">
-        <h2 class="sec">Resumo com IA <small>(Gemini)</small></h2>
-        <p class="secsub">Transcrição e resumo das reuniões usando a sua chave gratuita do Gemini.</p>
+        <h2 class="sec" data-i18n-html="sec_ai_html">Resumo com IA <small>(Gemini)</small></h2>
+        <p class="secsub" data-i18n="ai_sub">Transcrição e resumo das reuniões usando a sua chave gratuita do Gemini.</p>
         <div class="row">
-          <h3>Chave do Gemini</h3>
-          <p>Fica só nesta máquina. <a id="getkey">Pegar chave grátis no Google AI Studio</a></p>
-          <input type="password" id="geminiKey" placeholder="AIza... (sua chave do Gemini)" autocomplete="off" spellcheck="false">
+          <h3 data-i18n="gemini_key">Chave do Gemini</h3>
+          <p><span data-i18n="key_local">Fica só nesta máquina.</span> <a id="getkey" data-i18n="get_key_link">Pegar chave grátis no Google AI Studio</a></p>
+          <input type="password" id="geminiKey" data-i18n-ph="gemini_key_ph" placeholder="AIza... (sua chave do Gemini)" autocomplete="off" spellcheck="false">
           <select id="geminiModel" class="sub">
-            <option value="gemini-2.5-flash">gemini-2.5-flash (recomendado)</option>
+            <option value="gemini-2.5-flash" data-i18n="model_flash25">gemini-2.5-flash (recomendado)</option>
             <option value="gemini-2.0-flash">gemini-2.0-flash</option>
           </select>
         </div>
         <div class="row">
-          <h3>Idioma do resumo e das tarefas</h3>
-          <p>Muda o texto enviado ao Gemini.</p>
+          <h3 data-i18n="summ_lang_title">Idioma do resumo e das tarefas</h3>
+          <p data-i18n="summ_lang_sub">Muda o texto enviado ao Gemini.</p>
           <select id="summaryLang">
-            <option value="auto">Idioma natural da reunião</option>
-            <option value="pt">Sempre em português</option>
+            <option value="auto" data-i18n="lang_natural">Idioma natural da reunião</option>
+            <option value="pt" data-i18n="lang_browser">Idioma do navegador</option>
           </select>
         </div>
         <div class="row toggle">
-          <div><h3>Resumo automático ao parar</h3><p>Desligado: o resumo só sai quando você clicar em "Criar resumo" na aba Gravações.</p></div>
+          <div><h3 data-i18n="auto_summ_title">Resumo automático ao parar</h3><p data-i18n="auto_summ_sub">Desligado: o resumo só sai quando você clicar em "Criar resumo" na aba Gravações.</p></div>
           <label class="switch"><input type="checkbox" id="autoSummary"><span class="track"></span></label>
         </div>
       </section>
 
       <section class="card">
-        <h2 class="sec">Arquivo</h2>
-        <p class="secsub">Qualidade, nome e onde o MP3 é salvo.</p>
+        <h2 class="sec" data-i18n="sec_file">Arquivo</h2>
+        <p class="secsub" data-i18n="file_sub">Qualidade, nome e onde o MP3 é salvo.</p>
         <div class="row">
-          <h3>Qualidade do MP3</h3>
-          <p>Mono · 44,1 kHz. Bitrate maior = som melhor e arquivo maior. (Para resumir reuniões longas no Gemini, prefira a econômica — o resumo tem limite de tamanho.)</p>
+          <h3 data-i18n="mp3_quality">Qualidade do MP3</h3>
+          <p data-i18n="mp3_quality_sub">Mono · 44,1 kHz. Bitrate maior = som melhor e arquivo maior. (Para resumir reuniões longas no Gemini, prefira a econômica — o resumo tem limite de tamanho.)</p>
           <select id="bitrate">
-            <option value="48">Econômica — 48 kbps (~21 MB/h)</option>
-            <option value="96">Boa — 96 kbps (~43 MB/h)</option>
-            <option value="128">Alta — 128 kbps (~57 MB/h)</option>
+            <option value="48" data-i18n="bitrate_eco">Econômica — 48 kbps (~21 MB/h)</option>
+            <option value="96" data-i18n="bitrate_good">Boa — 96 kbps (~43 MB/h)</option>
+            <option value="128" data-i18n="bitrate_high">Alta — 128 kbps (~57 MB/h)</option>
           </select>
         </div>
         <div class="row">
-          <h3>Nome do arquivo</h3>
-          <p>Prefixo + data. Tokens: <b>AAAA</b> ano · <b>MM</b> mês · <b>DD</b> dia · <b>hh</b> hora · <b>mm</b> min · <b>ss</b> seg.</p>
+          <h3 data-i18n="filename_title">Nome do arquivo</h3>
+          <p data-i18n-html="filename_sub_html">Prefixo + data. Tokens: <b>AAAA</b> ano · <b>MM</b> mês · <b>DD</b> dia · <b>hh</b> hora · <b>mm</b> min · <b>ss</b> seg.</p>
           <input type="text" id="filenamePrefix" placeholder="reuniao" style="margin-bottom:8px">
           <input type="text" id="dateFormat" placeholder="AAAAMMDD-hhmm">
           <div class="chips">
@@ -269,41 +280,41 @@
             <button class="chip" data-fmt="DD-MM-AAAA_hhmm">DD-MM-AAAA_hhmm</button>
             <button class="chip" data-fmt="AAAA-MM-DD_hhhmm">AAAA-MM-DD_hhhmm</button>
           </div>
-          <div class="preview">Prévia: <b id="fmtPreview">reuniao-AAAAMMDD-hhmm.mp3</b></div>
+          <div class="preview"><span data-i18n="preview_label">Prévia:</span> <b id="fmtPreview">reuniao-AAAAMMDD-hhmm.mp3</b></div>
         </div>
         <div class="row">
-          <h3>Pasta de destino</h3>
-          <p>Subpasta dentro de Downloads. Para escolher qualquer pasta, ligue "Perguntar onde salvar".</p>
+          <h3 data-i18n="dest_folder">Pasta de destino</h3>
+          <p data-i18n="dest_folder_sub">Subpasta dentro de Downloads. Para escolher qualquer pasta, ligue "Perguntar onde salvar".</p>
           <input type="text" id="subfolder" placeholder="Reuniões">
         </div>
         <div class="row toggle">
-          <div><h3>Perguntar onde salvar</h3><p>Abre "Salvar como" a cada gravação.</p></div>
+          <div><h3 data-i18n="ask_save">Perguntar onde salvar</h3><p data-i18n="ask_save_sub">Abre "Salvar como" a cada gravação.</p></div>
           <label class="switch"><input type="checkbox" id="askWhereToSave"><span class="track"></span></label>
         </div>
       </section>
 
       <section class="card">
-        <h2 class="sec">Lembrete na reunião</h2>
-        <p class="secsub">O aviso flutuante que aparece no Teams/Meet.</p>
+        <h2 class="sec" data-i18n="sec_reminder">Lembrete na reunião</h2>
+        <p class="secsub" data-i18n="reminder_sub">O aviso flutuante que aparece no Teams/Meet.</p>
         <div class="row toggle">
-          <div><h3>Mostrar lembrete</h3><p>Pill no canto ao entrar numa reunião.</p></div>
+          <div><h3 data-i18n="show_reminder">Mostrar lembrete</h3><p data-i18n="show_reminder_sub">Pill no canto ao entrar numa reunião.</p></div>
           <label class="switch"><input type="checkbox" id="showPill"><span class="track"></span></label>
         </div>
         <div class="row toggle">
-          <div><h3>Aviso sonoro</h3><p>Toca um som curto e dá uma piscada quando o lembrete aparece.</p></div>
+          <div><h3 data-i18n="reminder_sound">Aviso sonoro</h3><p data-i18n="reminder_sound_sub">Toca um som curto e dá uma piscada quando o lembrete aparece.</p></div>
           <label class="switch"><input type="checkbox" id="pillSound"><span class="track"></span></label>
         </div>
         <div class="row">
-          <h3>Canto do lembrete</h3>
+          <h3 data-i18n="reminder_corner">Canto do lembrete</h3>
           <select id="pillCorner">
-            <option value="bottom-right">Inferior direito</option>
-            <option value="bottom-left">Inferior esquerdo</option>
-            <option value="top-right">Superior direito</option>
-            <option value="top-left">Superior esquerdo</option>
+            <option value="bottom-right" data-i18n="corner_br">Inferior direito</option>
+            <option value="bottom-left" data-i18n="corner_bl">Inferior esquerdo</option>
+            <option value="top-right" data-i18n="corner_tr">Superior direito</option>
+            <option value="top-left" data-i18n="corner_tl">Superior esquerdo</option>
           </select>
         </div>
         <div class="row">
-          <h3>Onde mostrar</h3>
+          <h3 data-i18n="where_show">Onde mostrar</h3>
           <div class="check"><label class="switch"><input type="checkbox" id="domTeams"><span class="track"></span></label><span>Microsoft Teams</span></div>
           <div class="check"><label class="switch"><input type="checkbox" id="domMeet"><span class="track"></span></label><span>Google Meet</span></div>
         </div>
@@ -313,23 +324,24 @@
     <!-- GRAVAÇÕES -->
     <div class="pane hidden" id="pane-rec">
       <div class="banner hidden" id="noKeyHint">
-        <div class="btxt">Configure a <b>chave do Gemini</b> em Ajustes para transcrever e resumir as gravações.</div>
-        <button class="act" id="goToKey">Configurar</button>
+        <div class="btxt" data-i18n-html="nokey_hint_html">Configure a <b>chave do Gemini</b> em Ajustes para transcrever e resumir as gravações.</div>
+        <button class="act" id="goToKey" data-i18n="configure">Configurar</button>
       </div>
       <section class="card">
         <div class="rechead">
-          <h3>Suas gravações</h3>
-          <div class="rhacts"><a id="importRecs">Importar MP3</a><a id="clearRecs">Limpar histórico</a></div>
+          <h3 data-i18n="your_recordings">Suas gravações</h3>
+          <div class="rhacts"><a id="importRecs" data-i18n="import_mp3">Importar MP3</a><a id="clearRecs" data-i18n="clear_history">Limpar histórico</a></div>
         </div>
-        <p class="secsub" style="margin-top:-8px">Tem gravações antigas na pasta mas o áudio sumiu da lista? Clique em <b>Importar MP3</b> e selecione os arquivos — ele re-vincula pelo nome.</p>
+        <p class="secsub" style="margin-top:-8px" data-i18n-html="import_sub_html">Tem gravações antigas na pasta mas o áudio sumiu da lista? Clique em <b>Importar MP3</b> e selecione os arquivos — ele re-vincula pelo nome.</p>
         <input type="file" id="importInput" accept="audio/mpeg,.mp3" multiple hidden>
-        <div id="recList"><div class="empty">Nenhuma gravação ainda.</div></div>
+        <div id="recList"><div class="empty" data-i18n="no_recordings">Nenhuma gravação ainda.</div></div>
       </section>
     </div>
   </div>
 
-  <div class="saved" id="saved">Salvo ✓</div>
+  <div class="saved" id="saved" data-i18n="saved_toast">Salvo ✓</div>
   <script src="format.js"></script>
+  <script src="i18n.js"></script>
   <script src="md.js"></script>
   <script src="gemini.js"></script>
   <script src="idb.js"></script>
