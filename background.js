@@ -119,7 +119,7 @@ function notifyRecordingSaved(ts, name, durationSec) {
       iconUrl: chrome.runtime.getURL('icons/icon128.png'),
       title: 'Reunião gravada ✓',
       message: name + ' · ' + fmtDur(durationSec) + '\nClique para ver a gravação e transcrever.',
-      priority: 2
+      priority: 2, requireInteraction: true
     }, (id) => { mxlog('notif ' + (id || 'null') + ' err=' + ((chrome.runtime.lastError && chrome.runtime.lastError.message) || '-')); });
   } catch (e) { mxlog('notif:throw ' + (e && e.message)); }
 }
