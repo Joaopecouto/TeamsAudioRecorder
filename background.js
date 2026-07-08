@@ -51,24 +51,6 @@ async function ensureOffscreen() {
     justification: 'Gravar o áudio da aba/sistema e do microfone e converter para MP3 localmente.'
   });
 }
-function getMediaStreamId(tabId) {
-  return new Promise((resolve, reject) => {
-    chrome.tabCapture.getMediaStreamId({ targetTabId: tabId }, (id) => {
-      const e = chrome.runtime.lastError;
-      e ? reject(new Error(e.message)) : resolve(id);
-    });
-  });
-}
-async function chooseDesktop() {
-  const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-  return new Promise((resolve) => {
-    const cb = (streamId) => resolve(streamId || null);
-    try {
-      if (tab) chrome.desktopCapture.chooseDesktopMedia(['screen', 'window', 'tab', 'audio'], tab, cb);
-      else chrome.desktopCapture.chooseDesktopMedia(['screen', 'window', 'tab', 'audio'], cb);
-    } catch (e) { resolve(null); }
-  });
-}
 function notifyTab() {
   if (recordingTabId != null) {
     chrome.tabs.sendMessage(recordingTabId, { type: 'STATE', recording, startedAt }).catch(() => {});
