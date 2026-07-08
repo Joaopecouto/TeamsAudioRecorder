@@ -417,6 +417,38 @@ async function importFiles(fileList) {
 $('importRecs').addEventListener('click', () => $('importInput').click());
 $('importInput').addEventListener('change', (e) => { importFiles(e.target.files); e.target.value = ''; });
 
+// ---------- onboarding (primeiro uso) ----------
+function openOnboarding() {
+  const ov = $('obOverlay');
+  $('obMicSt').textContent = ''; $('obNotifSt').textContent = '';
+  $('obNotifYN').classList.add('hidden'); $('obNotifTip').classList.add('hidden');
+  $('obKey').value = geminiKey || '';
+  mxApplyI18n(ov);
+  ov.classList.remove('hidden');
+}
+function closeOnboarding() { $('obOverlay').classList.add('hidden'); }
+$('obClose').addEventListener('click', closeOnboarding);
+$('obLater').addEventListener('click', closeOnboarding);
+$('obDone').addEventListener('click', closeOnboarding);
+$('obReopen').addEventListener('click', openOnboarding);
+$('obMic').addEventListener('click', async () => {
+  $('obMicSt').textContent = '…';
+  const ok = await requestMic();
+  if (ok) { settings.micEnabled = true; chrome.storage.sync.set({ micEnabled: true }); $('micSwitch').checked = true; await listMics(); $('obMicSt').textContent = mxt('ob_mic_ok'); }
+  else $('obMicSt').textContent = mxt('ob_mic_no');
+});
+$('obNotif').addEventListener('click', () => {
+  $('obNotifSt').textContent = '…'; $('obNotifTip').classList.add('hidden'); $('obNotifYN').classList.add('hidden');
+  chrome.runtime.sendMessage({ type: 'TEST_NOTIF', title: mxt('ob_test_title'), message: mxt('ob_test_msg') }, (res) => {
+    if (chrome.runtime.lastError || !res || !res.ok) { $('obNotifSt').textContent = mxt('ob_notif_fail'); $('obNotifTip').classList.remove('hidden'); return; }
+    $('obNotifSt').textContent = ''; $('obNotifYN').classList.remove('hidden');
+  });
+});
+$('obNotifYes').addEventListener('click', () => { $('obNotifYN').classList.add('hidden'); $('obNotifSt').textContent = mxt('ob_notif_ok'); });
+$('obNotifNo').addEventListener('click', () => { $('obNotifYN').classList.add('hidden'); $('obNotifTip').classList.remove('hidden'); });
+$('obKey').addEventListener('input', () => { geminiKey = $('obKey').value.trim(); hasKey = !!geminiKey; chrome.storage.local.set({ geminiKey }); $('geminiKey').value = geminiKey; updateNoKeyHint(); });
+$('obGetKey').addEventListener('click', () => chrome.tabs.create({ url: 'https://aistudio.google.com/apikey' }));
+
 // ---------- abas ----------
 function showTab(which) {
   document.querySelectorAll('.tab').forEach((t) => t.classList.toggle('active', t.dataset.tab === which));
@@ -451,5 +483,5 @@ chrome.storage.sync.get(DEFAULTS, (s) => {
     const m = hash.match(/#rec=(\d+)/);
     if (m) openDetail(Number(m[1]));
   }
-  if (hash === '#setup') { $('setupBanner').classList.remove('hidden'); setMic(true); }
+  if (hash === '#setup') openOnboarding();
 });

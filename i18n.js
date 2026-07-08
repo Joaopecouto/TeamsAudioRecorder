@@ -126,7 +126,18 @@ const MX_I18N = {
     t_import_done: 'Importado ✓ — %s re-vinculada(s), %s nova(s)',
     confirm_delete: 'Excluir "%s"?\nApaga o áudio, a transcrição e o resumo. Não dá pra desfazer.',
     confirm_clear: 'Limpar TODO o histórico?\nApaga TODAS as gravações — áudio, transcrições e resumos. Não dá pra desfazer.',
-    src_imported: 'Importado'
+    src_imported: 'Importado',
+    // --- onboarding (primeiro uso) ---
+    ob_welcome_title: 'Bem-vindo ao Gravador de reunião', ob_welcome_sub: 'Configure em 1 minuto. Dá pra fazer depois nos Ajustes.',
+    ob_mic_title: '1. Microfone', ob_mic_sub: 'Para gravar a sua voz junto com a reunião.',
+    ob_mic_ok: 'Microfone autorizado ✓', ob_mic_no: 'Permissão negada — clique de novo.',
+    ob_notif_title: '2. Notificações', ob_notif_sub: 'Avisa quando a gravação termina (e abre a gravação num clique).',
+    ob_notif_btn: 'Testar notificação', ob_notif_q: 'Viu a notificação aparecer?',
+    ob_notif_ok: 'Notificações funcionando ✓', ob_notif_fail: 'Não consegui criar a notificação — verifique a permissão.',
+    ob_notif_tip: 'Não apareceu? No Windows: Configurações → Sistema → Notificações → ligue o Brave/Chrome e desligue o "Não perturbe / Assistente de Foco". No Brave: brave://settings/content/notifications.',
+    ob_test_title: 'Teste de notificação ✓', ob_test_msg: 'Se você está vendo isto, as notificações funcionam!',
+    ob_key_title: '3. Chave do Gemini (opcional)', ob_key_sub: 'Para transcrever e resumir. É grátis no Google AI Studio.',
+    ob_yes: 'Sim', ob_no: 'Não', ob_later: 'Fazer depois', ob_done: 'Concluir', ob_reopen: 'Refazer configuração inicial'
   },
   en: {
     // --- common ---
@@ -227,7 +238,18 @@ const MX_I18N = {
     t_import_done: 'Imported ✓ — %s re-linked, %s new',
     confirm_delete: 'Delete "%s"?\nDeletes the audio, transcript and summary. Can\'t be undone.',
     confirm_clear: 'Clear ALL history?\nDeletes ALL recordings — audio, transcripts and summaries. Can\'t be undone.',
-    src_imported: 'Imported'
+    src_imported: 'Imported',
+    // --- onboarding (first run) ---
+    ob_welcome_title: 'Welcome to Meeting Recorder', ob_welcome_sub: 'Set up in 1 minute. You can do it later in Settings.',
+    ob_mic_title: '1. Microphone', ob_mic_sub: 'To record your voice along with the meeting.',
+    ob_mic_ok: 'Microphone allowed ✓', ob_mic_no: 'Permission denied — click again.',
+    ob_notif_title: '2. Notifications', ob_notif_sub: 'Alerts you when a recording finishes (and opens it in one click).',
+    ob_notif_btn: 'Test notification', ob_notif_q: 'Did you see the notification appear?',
+    ob_notif_ok: 'Notifications working ✓', ob_notif_fail: 'Couldn\'t create the notification — check the permission.',
+    ob_notif_tip: 'Didn\'t show? On Windows: Settings → System → Notifications → enable Brave/Chrome and turn off "Do not disturb / Focus assist". On Brave: brave://settings/content/notifications.',
+    ob_test_title: 'Notification test ✓', ob_test_msg: 'If you can see this, notifications work!',
+    ob_key_title: '3. Gemini key (optional)', ob_key_sub: 'To transcribe and summarize. It\'s free at Google AI Studio.',
+    ob_yes: 'Yes', ob_no: 'No', ob_later: 'Do later', ob_done: 'Done', ob_reopen: 'Redo initial setup'
   }
 };
 

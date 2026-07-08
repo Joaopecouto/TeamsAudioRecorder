@@ -178,6 +178,26 @@
 
     @media (max-width: 720px) { .detmain { grid-template-columns: 1fr; } }
 
+    /* ---- onboarding (primeiro uso) ---- */
+    .ob-overlay { position: fixed; inset: 0; background: rgba(10,39,41,.45); display: flex; align-items: center; justify-content: center; padding: 24px; z-index: 100; }
+    .ob-overlay.hidden { display: none; }
+    .ob-card { background: #fff; border-radius: 24px; padding: 32px; max-width: 440px; width: 100%; max-height: 90vh; overflow: auto; position: relative; box-shadow: 0 40px 80px rgba(10,39,41,.2); }
+    .ob-x { position: absolute; top: 16px; right: 16px; border: 0; background: transparent; font-size: 22px; color: var(--muted); cursor: pointer; line-height: 1; }
+    .ob-card h2 { font-size: 20px; font-weight: 700; margin: 0 0 4px; color: var(--ink); }
+    .ob-sub { font-size: 13px; color: var(--muted); margin: 0 0 20px; }
+    .ob-step { border-top: 1px solid var(--border); padding: 16px 0; }
+    .ob-step h3 { font-size: 15px; font-weight: 700; margin: 0 0 4px; color: var(--ink); }
+    .ob-step > p { font-size: 13px; color: var(--muted); margin: 0 0 12px; line-height: 1.5; }
+    .ob-step input { width: 100%; padding: 12px; border: 1px solid var(--border); border-radius: 8px; font-size: 14px; margin-bottom: 8px; color: var(--ink); background: var(--surface); }
+    .ob-btn { border: 1px solid var(--border); background: #fff; color: var(--teal); border-radius: 8px; padding: 10px 16px; font-size: 14px; cursor: pointer; font-family: inherit; }
+    .ob-btn.fill { background: var(--teal); color: hsl(188 40% 97%); border-color: var(--teal); }
+    .ob-status { font-size: 13px; margin-left: 10px; color: var(--teal-strong); font-weight: 600; }
+    .ob-yn { margin-top: 10px; font-size: 13px; color: var(--ink); }
+    .ob-mini { border: 1px solid var(--border); background: #fff; border-radius: 6px; padding: 4px 12px; font-size: 13px; cursor: pointer; margin-left: 4px; font-family: inherit; }
+    .ob-tip { margin-top: 10px; font-size: 12px; color: hsl(35 62% 32%); background: hsl(40 90% 95%); border-radius: 8px; padding: 12px; line-height: 1.5; }
+    .ob-tip.hidden, .ob-yn.hidden { display: none; }
+    .ob-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 20px; }
+
     .saved { position: fixed; left: 50%; bottom: 24px; transform: translate(-50%, 16px); background: var(--teal); color: hsl(188 40% 97%); padding: 12px 24px; border-radius: 24px; font-size: 14px; opacity: 0; pointer-events: none; transition: .25s ease; max-width: 80%; text-align: center; }
     .saved.show { opacity: 1; transform: translate(-50%, 0); }
   </style>
@@ -201,6 +221,7 @@
             <option value="pt">Português</option>
             <option value="en">English</option>
           </select>
+          <a id="obReopen" data-i18n="ob_reopen" style="display:inline-block; margin-top:12px">Refazer configuração inicial</a>
         </div>
       </section>
 
@@ -340,6 +361,43 @@
   </div>
 
   <div class="saved" id="saved" data-i18n="saved_toast">Salvo ✓</div>
+
+  <!-- Onboarding (primeiro uso) -->
+  <div class="ob-overlay hidden" id="obOverlay">
+    <div class="ob-card">
+      <button class="ob-x" id="obClose" title="×">×</button>
+      <h2 data-i18n="ob_welcome_title">Bem-vindo ao Gravador de reunião</h2>
+      <p class="ob-sub" data-i18n="ob_welcome_sub">Configure em 1 minuto. Dá pra fazer depois nos Ajustes.</p>
+
+      <div class="ob-step">
+        <h3 data-i18n="ob_mic_title">1. Microfone</h3>
+        <p data-i18n="ob_mic_sub">Para gravar a sua voz junto com a reunião.</p>
+        <button class="ob-btn" id="obMic" data-i18n="grant_mic">Permitir microfone</button>
+        <span class="ob-status" id="obMicSt"></span>
+      </div>
+
+      <div class="ob-step">
+        <h3 data-i18n="ob_notif_title">2. Notificações</h3>
+        <p data-i18n="ob_notif_sub">Avisa quando a gravação termina (e abre a gravação num clique).</p>
+        <button class="ob-btn" id="obNotif" data-i18n="ob_notif_btn">Testar notificação</button>
+        <span class="ob-status" id="obNotifSt"></span>
+        <div class="ob-yn hidden" id="obNotifYN"><span data-i18n="ob_notif_q">Viu a notificação aparecer?</span> <button class="ob-mini" id="obNotifYes" data-i18n="ob_yes">Sim</button> <button class="ob-mini" id="obNotifNo" data-i18n="ob_no">Não</button></div>
+        <div class="ob-tip hidden" id="obNotifTip" data-i18n="ob_notif_tip">Não apareceu?</div>
+      </div>
+
+      <div class="ob-step">
+        <h3 data-i18n="ob_key_title">3. Chave do Gemini (opcional)</h3>
+        <p data-i18n="ob_key_sub">Para transcrever e resumir. É grátis no Google AI Studio.</p>
+        <input type="password" id="obKey" data-i18n-ph="gemini_key_ph" placeholder="AIza...">
+        <a id="obGetKey" data-i18n="get_key_link">Pegar chave grátis no Google AI Studio</a>
+      </div>
+
+      <div class="ob-actions">
+        <button class="ob-btn" id="obLater" data-i18n="ob_later">Fazer depois</button>
+        <button class="ob-btn fill" id="obDone" data-i18n="ob_done">Concluir</button>
+      </div>
+    </div>
+  </div>
   <script src="format.js"></script>
   <script src="i18n.js"></script>
   <script src="md.js"></script>

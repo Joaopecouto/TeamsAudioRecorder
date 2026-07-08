@@ -269,6 +269,16 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   }
   if (msg.type === 'WARMUP') { ensureOffscreen().catch(() => {}); return false; }
   if (msg.type === 'GET_STATE') { sendResponse({ recording, startedAt }); return false; }
+  if (msg.type === 'TEST_NOTIF') {
+    if (!chrome.notifications) { sendResponse({ ok: false, err: 'sem permissão de notificações' }); return false; }
+    try {
+      chrome.notifications.create('mxtest', {
+        type: 'basic', iconUrl: chrome.runtime.getURL('icons/icon128.png'),
+        title: msg.title || 'Teste', message: msg.message || 'Notificações OK', priority: 2, requireInteraction: true
+      }, () => sendResponse({ ok: !chrome.runtime.lastError, err: chrome.runtime.lastError && chrome.runtime.lastError.message }));
+      return true; // resposta assíncrona (callback do create)
+    } catch (e) { sendResponse({ ok: false, err: e.message }); return false; }
+  }
 
   if (msg.type === 'START' || msg.type === 'PILL_START') {
     if (recording) { sendResponse({ ok: false, error: 'Já existe uma gravação em andamento.' }); return false; }
