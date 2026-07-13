@@ -8,6 +8,79 @@ const MX_SPACING_MS = 3500;             // espaço entre chamadas (free tier ~15
 
 function mxSleep(ms) { return new Promise((r) => setTimeout(r, ms)); }
 
+// ----- descoberta automática de modelo -----
+// Em vez de fixar um modelo (que o Google aposenta/renomeia com o tempo), perguntamos à API
+// quais modelos ESTA chave tem e escolhemos o melhor sozinhos. Assim basta colar a chave.
+// A lista abaixo NÃO afirma que esses modelos existem — é só a ORDEM de preferência aplicada
+// ao que a API realmente devolver. Flash = rápido + amigável ao free tier; multimodal (áudio).
+const MX_MODEL_PREF = [
+  'gemini-flash-latest',
+  'gemini-2.5-flash',
+  'gemini-2.0-flash',
+  'gemini-2.5-flash-lite',
+  'gemini-2.0-flash-lite',
+  'gemini-1.5-flash',
+  'gemini-pro-latest',
+  'gemini-2.5-pro',
+  'gemini-1.5-pro'
+];
+let _mxModelCache = null; // { key, list:[...] } — evita re-listar a cada chamada
+// status que valem TROCAR de modelo (o modelo sumiu, está no limite, ou sobrecarregado).
+// 429 = quota/limite do free tier; 5xx = sobrecarga temporária; 404 = modelo inexistente.
+function mxShouldSwitchModel(status) { return status === 404 || status === 429 || (status >= 500 && status <= 599); }
+
+// menor = melhor. `name` já sem o prefixo 'models/'.
+function mxScoreModel(name) {
+  const i = MX_MODEL_PREF.indexOf(name);
+  if (i >= 0) return i; // está na preferência explícita: usa a posição
+  let s = 100;          // fora da lista: heurística por nome
+  if (/flash/.test(name)) s -= 20;
+  if (/2\.5/.test(name)) s -= 8; else if (/2\.0/.test(name)) s -= 4;
+  if (/lite/.test(name)) s += 3;
+  if (/pro/.test(name)) s += 10;
+  if (/exp|preview/.test(name)) s += 6; // instáveis: só se não houver estável melhor
+  return s;
+}
+
+async function mxListModels(key) {
+  const url = 'https://generativelanguage.googleapis.com/v1beta/models?pageSize=200&key=' + encodeURIComponent(key);
+  const r = await fetch(url);
+  if (!r.ok) throw new Error('list ' + r.status);
+  const data = await r.json();
+  return (data && data.models) || [];
+}
+
+// lista ORDENADA (melhor -> pior) dos modelos que a CHAVE realmente possui e que suportam
+// generateContent. Em cache por chave. Limitada aos 5 melhores (o revezamento tenta em ordem).
+// Se não der pra listar, cai nos aliases estáveis conhecidos (o -latest não costuma dar 404).
+async function mxResolveModelList(key) {
+  if (_mxModelCache && _mxModelCache.key === key && _mxModelCache.list && _mxModelCache.list.length) {
+    return _mxModelCache.list;
+  }
+  let models;
+  try { models = await mxListModels(key); } catch (e) { return ['gemini-flash-latest', 'gemini-2.5-flash', 'gemini-2.0-flash']; }
+  const usable = models
+    .filter((m) => (m.supportedGenerationMethods || []).indexOf('generateContent') >= 0)
+    .map((m) => (m.name || '').replace(/^models\//, ''))
+    .filter(Boolean)
+    // fora do que serve p/ transcrever/resumir texto+áudio (imagem, embeddings, tts, etc.)
+    .filter((n) => !/embedding|aqa|imagen|image|-tts|gemma|vision/.test(n));
+  if (!usable.length) return ['gemini-flash-latest', 'gemini-2.5-flash', 'gemini-2.0-flash'];
+  usable.sort((a, b) => mxScoreModel(a) - mxScoreModel(b));
+  const list = usable.slice(0, 5);
+  _mxModelCache = { key, list };
+  return list;
+}
+// melhor modelo só (p/ chamadas diretas que não fazem revezamento)
+async function mxResolveModel(key) { return (await mxResolveModelList(key))[0]; }
+
+// modelos a usar dada a config: modelo forçado -> só ele; 'auto'/vazio -> a lista resolvida.
+async function mxModelsFor(key, model) {
+  if (model && model !== 'auto') return [model];
+  const list = await mxResolveModelList(key);
+  return (list && list.length) ? list : ['gemini-2.5-flash'];
+}
+
 async function mxBlobToBase64(blob) {
   const buf = await blob.arrayBuffer();
   const bytes = new Uint8Array(buf);
@@ -71,10 +144,11 @@ function mxTargetLang(summaryLang, uiLang) {
   return nav.indexOf('en') === 0 ? 'en' : 'pt';
 }
 
-// ----- chamada base -----
+// ----- chamada base (UMA tentativa, modelo concreto) -----
 async function mxGeminiCall(key, model, parts, genConfig) {
+  const useModel = (model && model !== 'auto') ? model : await mxResolveModel(key);
   const url = 'https://generativelanguage.googleapis.com/v1beta/models/' +
-    encodeURIComponent(model || 'gemini-2.5-flash') + ':generateContent?key=' + encodeURIComponent(key);
+    encodeURIComponent(useModel) + ':generateContent?key=' + encodeURIComponent(key);
   const body = { contents: [{ parts }] };
   if (genConfig) body.generationConfig = genConfig;
   let r;
@@ -86,7 +160,7 @@ async function mxGeminiCall(key, model, parts, genConfig) {
   } catch (e) { return { ok: false, error: 'rede: ' + e.message }; }
   if (!r.ok) {
     let t = ''; try { t = await r.text(); } catch (e) { /* ignore */ }
-    return { ok: false, error: 'Gemini ' + r.status + ': ' + t.slice(0, 180), status: r.status };
+    return { ok: false, error: 'Gemini ' + r.status + ': ' + t.slice(0, 180), status: r.status, model: useModel };
   }
   let data;
   try { data = await r.json(); } catch (e) { return { ok: false, error: 'resposta inválida do Gemini' }; }
@@ -96,25 +170,39 @@ async function mxGeminiCall(key, model, parts, genConfig) {
   return { ok: true, text };
 }
 
-// transcreve UM segmento (áudio inline)
+// chamada RESILIENTE: tenta os modelos em ordem; se um está no limite/sobrecarregado (429/5xx)
+// ou sumiu (404), passa pro próximo na hora. Se TODOS falharem por indisponibilidade, espera e
+// refaz a lista (até 3 rodadas). Erro "de verdade" (400/403 — chave inválida, etc.) aborta já.
+// É isto que faz "só colar a chave e funcionar": o revezamento cobre a instabilidade do free tier.
+async function mxCallWithFallback(key, model, parts, genConfig) {
+  const models = await mxModelsFor(key, model);
+  let last = null;
+  for (let round = 0; round < 3; round++) {
+    for (let mi = 0; mi < models.length; mi++) {
+      const r = await mxGeminiCall(key, models[mi], parts, genConfig);
+      if (r.ok) {
+        // promove o modelo que funcionou pro topo do cache: as próximas partes já começam por ele
+        if (mi > 0 && _mxModelCache && _mxModelCache.list === models) {
+          const win = models.splice(mi, 1)[0];
+          models.unshift(win);
+        }
+        return r;
+      }
+      last = r;
+      if (!(r.status && mxShouldSwitchModel(r.status))) return r; // não é indisponibilidade -> aborta
+    }
+    if (round < 2) await mxSleep(Math.min(2500 * Math.pow(2, round), 15000) + Math.floor(Math.random() * 600));
+  }
+  return last || { ok: false, error: 'Gemini indisponível no momento — tente novamente em instantes.' };
+}
+
+// transcreve UM segmento (áudio inline), já com revezamento de modelos
 async function mxGeminiAudio(key, model, prompt, blob, genConfig) {
   if (!key) return { ok: false, error: 'Sem chave do Gemini (Ajustes → Resumo com IA).' };
   if (blob.size > MX_INLINE_MAX) return { ok: false, error: 'uma parte ficou grande demais (~14 MB) — reduza o bitrate em Ajustes.' };
   let b64;
   try { b64 = await mxBlobToBase64(blob); } catch (e) { return { ok: false, error: 'áudio: ' + e.message }; }
-  return mxGeminiCall(key, model, [{ text: prompt }, { inline_data: { mime_type: 'audio/mpeg', data: b64 } }], genConfig);
-}
-
-// mesma coisa, mas com backoff em 429/5xx (rate limit por minuto / sobrecarga temporária)
-async function mxGeminiAudioBackoff(key, model, prompt, blob, attempt, genConfig) {
-  attempt = attempt || 0;
-  const r = await mxGeminiAudio(key, model, prompt, blob, genConfig);
-  if (r.ok) return r;
-  if (r.status && (r.status === 429 || r.status >= 500) && attempt < 4) {
-    await mxSleep(Math.min(2000 * Math.pow(2, attempt), 20000) + Math.floor(Math.random() * 500));
-    return mxGeminiAudioBackoff(key, model, prompt, blob, attempt + 1, genConfig);
-  }
-  return r;
+  return mxCallWithFallback(key, model, [{ text: prompt }, { inline_data: { mime_type: 'audio/mpeg', data: b64 } }], genConfig);
 }
 
 // transcreve TODAS as partes em sequência (espaçadas) e junta os textos.
@@ -129,7 +217,7 @@ async function mxTranscribeSegments(key, model, lang, blobs, onProgress) {
   const parts = [];
   for (let i = 0; i < blobs.length; i++) {
     if (onProgress) onProgress(i, blobs.length);
-    const r = await mxGeminiAudioBackoff(key, model, prompt, blobs[i], 0, genConfig);
+    const r = await mxGeminiAudio(key, model, prompt, blobs[i], genConfig);
     if (!r.ok) return { ok: false, error: 'parte ' + (i + 1) + '/' + blobs.length + ': ' + r.error, partial: parts.join('\n\n') };
     parts.push(r.text);
     if (i < blobs.length - 1) await mxSleep(MX_SPACING_MS);
@@ -143,7 +231,7 @@ async function mxSummarizeTranscript(key, model, lang, transcript) {
   if (!key) return { ok: false, error: 'Sem chave do Gemini (Ajustes → Resumo com IA).' };
   if (!transcript || !transcript.trim()) return { ok: false, error: 'transcrição vazia.' };
   const prompt = mxSummaryPromptText(lang) + '\n\n--- TRANSCRIÇÃO ---\n\n' + transcript;
-  return mxGeminiCall(key, model, [{ text: prompt }]);
+  return mxCallWithFallback(key, model, [{ text: prompt }]);
 }
 
 // fatia o arquivo ÚNICO em partes p/ transcrição, usando os offsets de byte (limites de

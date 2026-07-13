@@ -7,7 +7,7 @@ const DEFAULTS = {
   subfolder: 'Reuniões', askWhereToSave: false,
   filenamePrefix: 'reuniao', dateFormat: 'AAAAMMDD-hhmm',
   showPill: true, pillCorner: 'bottom-right', domMeet: true, domTeams: true,
-  autoSummary: false, summaryLang: 'auto', geminiModel: 'gemini-2.5-flash', pillSound: true, uiLang: 'auto'
+  autoSummary: false, summaryLang: 'auto', geminiModel: 'auto', pillSound: true, uiLang: 'auto'
 };
 
 let recording = false;
@@ -116,6 +116,8 @@ if (chrome.notifications && chrome.notifications.onClicked) {
 
 async function handleRecDone(m) {
   const cfg = await chrome.storage.sync.get(DEFAULTS);
+  // aliases fixos antigos foram aposentados (404): trata como 'auto' (o app escolhe pela chave)
+  if (cfg.geminiModel === 'gemini-2.5-flash' || cfg.geminiModel === 'gemini-2.0-flash') cfg.geminiModel = 'auto';
   const sub = sanitize(cfg.subfolder);
   const base = sanitize(mxFilename(cfg.filenamePrefix, cfg.dateFormat, '.mp3'));
   const filename = (sub ? sub + '/' : '') + base;

@@ -3,7 +3,7 @@ const DEFAULTS = {
   subfolder: 'Reuniões', askWhereToSave: false,
   filenamePrefix: 'reuniao', dateFormat: 'AAAAMMDD-hhmm',
   showPill: true, pillCorner: 'bottom-right', domMeet: true, domTeams: true,
-  autoSummary: false, summaryLang: 'auto', geminiModel: 'gemini-2.5-flash', pillSound: true, uiLang: 'auto'
+  autoSummary: false, summaryLang: 'auto', geminiModel: 'auto', pillSound: true, uiLang: 'auto'
 };
 const $ = (id) => document.getElementById(id);
 let recording = false, startedAt = 0, tick = null, settings = Object.assign({}, DEFAULTS);

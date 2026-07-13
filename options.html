@@ -261,8 +261,9 @@
           <p><span data-i18n="key_local">Fica só nesta máquina.</span> <a id="getkey" data-i18n="get_key_link">Pegar chave grátis no Google AI Studio</a></p>
           <input type="password" id="geminiKey" data-i18n-ph="gemini_key_ph" placeholder="AIza... (sua chave do Gemini)" autocomplete="off" spellcheck="false">
           <select id="geminiModel" class="sub">
-            <option value="gemini-2.5-flash" data-i18n="model_flash25">gemini-2.5-flash (recomendado)</option>
-            <option value="gemini-2.0-flash">gemini-2.0-flash</option>
+            <option value="auto" data-i18n="model_auto">Automático — melhor modelo da sua chave (recomendado)</option>
+            <option value="gemini-2.5-flash" data-i18n="model_flash25">Forçar gemini-2.5-flash</option>
+            <option value="gemini-2.0-flash" data-i18n="model_flash20">Forçar gemini-2.0-flash</option>
           </select>
         </div>
         <div class="row">

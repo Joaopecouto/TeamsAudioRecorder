@@ -3,7 +3,7 @@ const DEFAULTS = {
   subfolder: 'Reuniões', askWhereToSave: false,
   filenamePrefix: 'reuniao', dateFormat: 'AAAAMMDD-hhmm',
   showPill: true, pillCorner: 'bottom-right', domMeet: true, domTeams: true,
-  autoSummary: false, summaryLang: 'auto', geminiModel: 'gemini-2.5-flash', pillSound: true, uiLang: 'auto'
+  autoSummary: false, summaryLang: 'auto', geminiModel: 'auto', pillSound: true, uiLang: 'auto'
 };
 const $ = (id) => document.getElementById(id);
 let settings = Object.assign({}, DEFAULTS);
@@ -472,7 +472,14 @@ chrome.storage.onChanged.addListener((changes, area) => {
 
 // ---------- init ----------
 chrome.storage.sync.get(DEFAULTS, (s) => {
-  settings = s; mxSetLang(settings.uiLang); mxApplyI18n(document); reflect();
+  settings = s;
+  // Migração: os aliases fixos antigos foram aposentados pelo Google (davam 404). Quem tinha um
+  // deles salvo (era o default antigo) passa a usar 'auto' = o app escolhe o modelo pela chave.
+  if (settings.geminiModel === 'gemini-2.5-flash' || settings.geminiModel === 'gemini-2.0-flash') {
+    settings.geminiModel = 'auto';
+    chrome.storage.sync.set({ geminiModel: 'auto' });
+  }
+  mxSetLang(settings.uiLang); mxApplyI18n(document); reflect();
   chrome.storage.local.get({ geminiKey: '' }, ({ geminiKey: k }) => {
     geminiKey = k; hasKey = !!k; $('geminiKey').value = k;
     updateNoKeyHint(); loadRecordings();
