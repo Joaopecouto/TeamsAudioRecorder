@@ -1,9 +1,11 @@
+<p align="center"><img src="https://raw.githubusercontent.com/Joaopecouto/Joaopecouto/main/assets/projects/v1/gravador.png" width="96" alt="Ícone do projeto"></p>
+
 <h1 align="center">Gravador de Reunião</h1>
 
 <p align="center">Extensão Chrome (Manifest V3) que grava reuniões do Google Meet e do Microsoft Teams, transcreve e resume.<br><sub><i>Chrome extension (Manifest V3) that records, transcribes and summarizes Google Meet and Microsoft Teams meetings.</i></sub></p>
 
 <p align="center">
-  <kbd><img src="https://raw.githubusercontent.com/Joaopecouto/Joaopecouto/main/assets/icons/v2/manifest-v3.svg" height="18" alt=""> Manifest V3</kbd> <kbd><img src="https://raw.githubusercontent.com/Joaopecouto/Joaopecouto/main/assets/icons/v2/javascript.svg" height="18" alt=""> JavaScript</kbd> <kbd><img src="https://raw.githubusercontent.com/Joaopecouto/Joaopecouto/main/assets/icons/v2/gemini.svg" height="18" alt=""> Gemini API</kbd>
+  <kbd><img src="https://raw.githubusercontent.com/Joaopecouto/Joaopecouto/main/assets/icons/v2/manifest-v3.svg" height="18" align="absmiddle" alt=""> Manifest V3</kbd> <kbd><img src="https://raw.githubusercontent.com/Joaopecouto/Joaopecouto/main/assets/icons/v2/javascript.svg" height="18" align="absmiddle" alt=""> JavaScript</kbd> <kbd><img src="https://raw.githubusercontent.com/Joaopecouto/Joaopecouto/main/assets/icons/v2/gemini.svg" height="18" align="absmiddle" alt=""> Gemini API</kbd>
 </p>
 
 <p align="center">
