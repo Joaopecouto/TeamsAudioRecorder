@@ -56,6 +56,8 @@ flowchart TD
 
 O áudio vai do navegador para um offscreen document, a peça do Manifest V3 que consegue manter captura de mídia viva sem janela visível.
 
+<p align="center"><img src="./assets/screens/popup-gravando.png" alt="Popup da extensão durante a gravação, com o cronômetro e o botão de parar." width="92%"><br><sub>Popup da extensão durante a gravação, com o cronômetro e o botão de parar.</sub></p>
+
 - O seletor de `getDisplayMedia` abre dentro do offscreen, não no service worker. O vídeo é descartado e só a faixa de áudio é usada. Se você esquecer de marcar "compartilhar áudio", a extensão avisa.
 - O microfone entra pelo `getUserMedia` com cancelamento de eco e supressão de ruído. Você escolhe o aparelho e o ganho (padrão 2). Se o aparelho sumir, volta para o padrão. Se a permissão for negada, grava só o sistema e avisa.
 - A mixagem é um nó de ganho alimentado pelas duas fontes. Um ScriptProcessor mono lê o PCM e entrega blocos de 1152 amostras ao lamejs.
@@ -66,6 +68,8 @@ O áudio vai do navegador para um offscreen document, a peça do Manifest V3 que
 
 A extensão usa o motor de legendas que o Meet e o Teams já têm, no navegador do próprio usuário.
 
+<p align="center"><img src="./assets/screens/transcricao-por-falante.png" alt="Transcrição com o nome de quem fala e o tempo de cada fala, lida das legendas da própria sala." width="92%"><br><sub>Transcrição com o nome de quem fala e o tempo de cada fala, lida das legendas da própria sala.</sub></p>
+
 - Um `MutationObserver` observa o DOM e agenda uma varredura curta a cada mudança. Cada bloco de legenda vira um registro próprio, indexado pelo nó do DOM.
 - No Meet, os seletores cobrem o bloco de legenda, o nome do falante (ou o `alt` do avatar) e o texto. No Teams, o texto vem de `closed-caption-text` e o nome de `author`, só dentro do renderizador de legendas, para o chat não entrar na transcrição.
 - O Meet apaga as linhas antigas de uma fala longa. Por isso `mergeCaptionText` procura a sobreposição entre o texto novo e o acumulado e só acrescenta o que falta.
@@ -75,6 +79,8 @@ A extensão usa o motor de legendas que o Meet e o Teams já têm, no navegador 
 #### Fallback por áudio
 
 Quando a sala não tem legenda, ou a política da empresa a bloqueia, a gravação fica sem transcrição oficial.
+
+<p align="center"><img src="./assets/screens/sem-transcricao.png" alt="Gravação sem legenda: a transcrição sai do áudio, enviado ao Gemini em partes." width="92%"><br><sub>Gravação sem legenda: a transcrição sai do áudio, enviado ao Gemini em partes.</sub></p>
 
 - Se você pedir transcrição ou resumo, o MP3 é fatiado por offsets de byte anotados durante a codificação, sem cortar o arquivo salvo.
 - Cada parte tem no máximo 10 minutos ou cerca de 11 MB, o que vier primeiro, e vai ao Gemini em base64, uma de cada vez, com pausa de 3,5 s entre chamadas.
@@ -87,6 +93,10 @@ Quando a sala não tem legenda, ou a política da empresa a bloqueia, a gravaç�
 - `.txt`: linhas `[mm:ss] Nome: texto`. Falas anteriores ao Gravar aparecem como `[-02:10]`.
 - `.md`: o resumo, baixável pela aba Gravações.
 
+<p align="center"><img src="./assets/screens/detalhe-exportar.png" alt="Detalhe da gravação com os botões para copiar e baixar a transcrição em .txt e .vtt." width="92%"><br><sub>Detalhe da gravação com os botões para copiar e baixar a transcrição em .txt e .vtt.</sub></p>
+
+<p align="center"><img src="./assets/screens/ajustes-arquivo.png" alt="Ajustes do arquivo: qualidade do MP3, formato do nome com prévia ao vivo e pasta de destino." width="92%"><br><sub>Ajustes do arquivo: qualidade do MP3, formato do nome com prévia ao vivo e pasta de destino.</sub></p>
+
 #### Resumo com Gemini
 
 - A chave é sua e fica em `chrome.storage.local`. A extensão pergunta à API quais modelos a chave possui e ordena por preferência (Flash primeiro).
@@ -94,9 +104,17 @@ Quando a sala não tem legenda, ou a política da empresa a bloqueia, a gravaç�
 - O prompt pede resumo executivo, participantes, decisões, itens de ação em tabela, pontos em aberto e próximos passos, atribuídos aos nomes reais e sem inventar nada. O idioma pode seguir a reunião ou ficar fixo em português ou inglês.
 - O resumo automático ao parar vem desligado por padrão.
 
+<p align="center"><img src="./assets/screens/ajustes-gemini.png" alt="Ajustes do resumo: chave própria, modelo automático, idioma e resumo automático ao parar." width="92%"><br><sub>Ajustes do resumo: chave própria, modelo automático, idioma e resumo automático ao parar.</sub></p>
+
+<p align="center"><img src="./assets/screens/resumo-gemini.png" alt="Resumo gerado com decisões, participantes e itens de ação." width="92%"><br><sub>Resumo gerado com decisões, participantes e itens de ação.</sub></p>
+
 #### Histórico e interface
 
 A página de Ajustes e Gravações lista as gravações, com player, transcrição, resumo, download e exclusão. A interface tem português e inglês, com troca em tempo de execução. Um balão flutuante, em Shadow DOM, lembra de gravar ao entrar na call.
+
+<p align="center"><img src="./assets/screens/pill-lembrete.png" alt="Balão flutuante que aparece ao entrar na call e lembra de gravar." width="92%"><br><sub>Balão flutuante que aparece ao entrar na call e lembra de gravar.</sub></p>
+
+<p align="center"><img src="./assets/screens/lista-gravacoes.png" alt="Aba Gravações: lista com duração, tamanho e marcas de transcrição e resumo." width="92%"><br><sub>Aba Gravações: lista com duração, tamanho e marcas de transcrição e resumo.</sub></p>
 
 ### Arquitetura
 
@@ -197,6 +215,8 @@ flowchart TD
 
 Audio goes from the browser to an offscreen document, the Manifest V3 piece that can keep media capture alive without a visible window.
 
+<p align="center"><img src="./assets/screens/popup-gravando.png" alt="Extension popup while recording, with the timer and the stop button." width="92%"><br><sub>Extension popup while recording, with the timer and the stop button.</sub></p>
+
 - The `getDisplayMedia` picker opens inside the offscreen document, not in the service worker. Video is discarded and only the audio track is used. If you forget to tick "share audio", the extension warns you.
 - The microphone comes in through `getUserMedia` with echo cancellation and noise suppression. You choose the device and the gain (default 2). If the device disappears, it falls back to the default. If permission is denied, it records system audio only and says so.
 - Mixing is a gain node fed by both sources. A mono ScriptProcessor reads the PCM and hands blocks of 1152 samples to lamejs.
@@ -207,6 +227,8 @@ Audio goes from the browser to an offscreen document, the Manifest V3 piece that
 
 The extension uses the caption engine Meet and Teams already have, in the user's own browser.
 
+<p align="center"><img src="./assets/screens/transcricao-por-falante.png" alt="Transcript with the speaker name and timestamp of each turn, read from the meeting's own captions." width="92%"><br><sub>Transcript with the speaker name and timestamp of each turn, read from the meeting's own captions.</sub></p>
+
 - A `MutationObserver` watches the DOM and schedules a short sweep on every change. Each caption block becomes its own record, keyed by the DOM node.
 - On Meet, selectors cover the caption block, the speaker name (or the avatar `alt`) and the text. On Teams, text comes from `closed-caption-text` and the name from `author`, only inside the caption renderer, so chat stays out of the transcript.
 - Meet erases old lines of a long utterance. `mergeCaptionText` therefore looks for the overlap between new and accumulated text and appends only what is missing.
@@ -216,6 +238,8 @@ The extension uses the caption engine Meet and Teams already have, in the user's
 #### Audio fallback
 
 When the room has no captions, or company policy blocks them, the recording has no official transcript.
+
+<p align="center"><img src="./assets/screens/sem-transcricao.png" alt="A recording without captions: the transcript comes from the audio, sent to Gemini in chunks." width="92%"><br><sub>A recording without captions: the transcript comes from the audio, sent to Gemini in chunks.</sub></p>
 
 - If you ask for a transcript or summary, the MP3 is sliced by byte offsets noted during encoding, without cutting the saved file.
 - Each part is at most 10 minutes or about 11 MB, whichever comes first, and goes to Gemini as base64, one at a time, with a 3.5 s pause between calls.
@@ -228,6 +252,10 @@ When the room has no captions, or company policy blocks them, the recording has 
 - `.txt`: lines like `[mm:ss] Name: text`. Speech before Record shows as `[-02:10]`.
 - `.md`: the summary, downloadable from the Recordings tab.
 
+<p align="center"><img src="./assets/screens/detalhe-exportar.png" alt="Recording detail with buttons to copy and download the transcript as .txt and .vtt." width="92%"><br><sub>Recording detail with buttons to copy and download the transcript as .txt and .vtt.</sub></p>
+
+<p align="center"><img src="./assets/screens/ajustes-arquivo.png" alt="File settings: MP3 quality, filename format with a live preview, and destination folder." width="92%"><br><sub>File settings: MP3 quality, filename format with a live preview, and destination folder.</sub></p>
+
 #### Gemini summary
 
 - The key is yours and lives in `chrome.storage.local`. The extension asks the API which models the key has and ranks them by preference (Flash first).
@@ -235,9 +263,17 @@ When the room has no captions, or company policy blocks them, the recording has 
 - The prompt asks for an executive summary, participants, decisions, action items as a table, open points and next steps, attributed to the real names and without inventing anything. The language can follow the meeting or be fixed to Portuguese or English.
 - Automatic summary on stop is off by default.
 
+<p align="center"><img src="./assets/screens/ajustes-gemini.png" alt="Summary settings: your own key, automatic model, language and automatic summary on stop." width="92%"><br><sub>Summary settings: your own key, automatic model, language and automatic summary on stop.</sub></p>
+
+<p align="center"><img src="./assets/screens/resumo-gemini.png" alt="Generated summary with decisions, participants and action items." width="92%"><br><sub>Generated summary with decisions, participants and action items.</sub></p>
+
 #### History and interface
 
 The Settings and Recordings page lists recordings with a player, transcript, summary, download and delete. The interface is in Portuguese and English, switchable at runtime. A floating pill, in Shadow DOM, reminds you to record when you join the call.
+
+<p align="center"><img src="./assets/screens/pill-lembrete.png" alt="Floating pill that shows up when you join a call and reminds you to record." width="92%"><br><sub>Floating pill that shows up when you join a call and reminds you to record.</sub></p>
+
+<p align="center"><img src="./assets/screens/lista-gravacoes.png" alt="Recordings tab: list with duration, size and transcript and summary tags." width="92%"><br><sub>Recordings tab: list with duration, size and transcript and summary tags.</sub></p>
 
 ### Architecture
 
