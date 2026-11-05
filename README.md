@@ -22,7 +22,7 @@
 
 ### Visão geral
 
-O Gravador de Reunião é uma extensão do Chrome (Manifest V3) que grava o áudio do sistema e, se você quiser, o microfone, e entrega um MP3 leve codificado na própria máquina. Em paralelo, ela lê as legendas oficiais do Google Meet e do Microsoft Teams e monta uma transcrição com o nome de quem fala. No fim você já tem `.mp3`, `.vtt` e `.txt`, mais um resumo opcional gerado pelo Gemini com a sua própria chave. Nenhum bot entra na sala e não existe nenhum servidor próprio: tudo fica no navegador. Versão atual: 1.1.0, publicada na Chrome Web Store.
+O Gravador de Reunião é uma extensão do Chrome (Manifest V3) que grava o áudio do sistema e, se você quiser, o microfone, e entrega um MP3 leve codificado na própria máquina. Em paralelo, ela lê as legendas oficiais do Google Meet e do Microsoft Teams e monta uma transcrição com o nome de quem fala. No fim você já tem `.mp3`, `.vtt` e `.txt`, mais um resumo opcional gerado pelo Gemini com a sua própria chave. Nenhum bot entra na sala e não existe nenhum servidor próprio: tudo fica no navegador. A versão atual é a 1.1.0, publicada na Chrome Web Store.
 
 ### Como funciona
 
@@ -85,10 +85,10 @@ Quando a sala não tem legenda, ou a política da empresa a bloqueia, a gravaç�
 
 #### Exportações
 
-- `.mp3`: baixado ao parar, em Downloads, na subpasta configurada (padrão `Reuniões`), ou com "Salvar como" se você preferir. O nome segue um formato de data configurável, com prévia ao vivo.
-- `.vtt`: blocos WebVTT com `<v Nome>` e tempos alinhados ao MP3. Pode baixar automático ou sob demanda.
-- `.txt`: linhas `[mm:ss] Nome: texto`. Falas anteriores ao Gravar aparecem como `[-02:10]`.
-- `.md`: o resumo, baixável pela aba Gravações.
+- O `.mp3` é baixado ao parar, em Downloads, na subpasta configurada (padrão `Reuniões`), ou com "Salvar como" se você preferir. O nome segue um formato de data configurável, com prévia ao vivo.
+- O `.vtt` traz blocos WebVTT com `<v Nome>` e tempos alinhados ao MP3. Ele pode baixar automático ou sob demanda.
+- O `.txt` tem linhas `[mm:ss] Nome: texto`. As falas anteriores ao Gravar aparecem como `[-02:10]`.
+- O `.md` é o resumo, que você baixa pela aba Gravações.
 
 <p align="center"><img src="./assets/screens/detalhe-exportar.png" alt="Detalhe da gravação com os botões para copiar e baixar a transcrição em .txt e .vtt." width="92%"><br><sub>Detalhe da gravação com os botões para copiar e baixar a transcrição em .txt e .vtt.</sub></p>
 
@@ -115,12 +115,12 @@ A página de Ajustes e Gravações lista as gravações, com player, transcriç�
 
 ### Arquitetura
 
-- `content.js`: balão, motor de legendas, buffer e envio das falas.
-- `background.js`: service worker. Estado, montagem de `.txt` e `.vtt`, downloads, notificação, resumo automático.
-- `offscreen.js`: captura, mixagem e codificação MP3.
-- `gemini.js`: modelos, prompts, chamadas com revezamento, fatiamento.
-- `idb.js`, `format.js`, `md.js`, `i18n.js`: IndexedDB, nomes de arquivo, Markdown para HTML sem biblioteca, textos.
-- `popup.js` e `options.js`: controles e histórico.
+- O `content.js` cuida do balão, do motor de legendas, do buffer e do envio das falas.
+- O `background.js` é o service worker. Ele guarda o estado, monta o `.txt` e o `.vtt`, faz os downloads, mostra a notificação e dispara o resumo automático.
+- O `offscreen.js` faz a captura, a mixagem e a codificação MP3.
+- O `gemini.js` trata dos modelos, dos prompts, das chamadas com revezamento e do fatiamento.
+- O `idb.js`, o `format.js`, o `md.js` e o `i18n.js` cuidam do IndexedDB, dos nomes de arquivo, da conversão de Markdown para HTML sem biblioteca e dos textos.
+- O `popup.js` e o `options.js` são os controles e o histórico.
 
 ```mermaid
 flowchart LR
@@ -134,13 +134,13 @@ flowchart LR
     OP --> GM
 ```
 
-Onde ficam os dados: o MP3 inteiro de cada gravação fica no IndexedDB (as 12 mais recentes). Metadados, transcrição, VTT e resumo ficam em `chrome.storage.local` (até 50 registros). Os ajustes ficam em `chrome.storage.sync`. A chave do Gemini fica em `chrome.storage.local`. O estado da gravação em andamento fica em `chrome.storage.session`.
+Os dados ficam em lugares diferentes. O MP3 inteiro de cada gravação fica no IndexedDB (as 12 mais recentes). Metadados, transcrição, VTT e resumo ficam em `chrome.storage.local` (até 50 registros). Os ajustes ficam em `chrome.storage.sync`. A chave do Gemini fica em `chrome.storage.local`. O estado da gravação em andamento fica em `chrome.storage.session`.
 
 ### Decisões de engenharia
 
 1. **Codificar MP3 ao vivo.** O caminho antigo gravava webm, decodificava tudo em PCM e codificava no fim. A partir de uns 10 minutos o renderer estourava a memória e o Chrome encerrava o offscreen sem erro, e a gravação sumia. Codificar bloco a bloco mantém a memória quase constante.
 2. **Um arquivo só, com cortes anotados.** O MP3 salvo nunca é cortado. Os pontos de corte são apenas offsets de byte em limites de frame, usados no fallback para fatiar o blob na hora de transcrever.
-3. **Ler a legenda oficial em vez de ouvir o áudio.** Dá o nome real de quem fala e dispensa mandar áudio pesado ao Gemini. O resumo parte de texto puro.
+3. **Ler a legenda oficial em vez de ouvir o áudio.** Assim a extensão tem o nome real de quem fala e dispensa mandar áudio pesado ao Gemini. O resumo parte de texto puro.
 4. **Estado persistido em `storage.session`.** O service worker do MV3 dorme e perde variáveis. A gravação em andamento e as falas acumuladas sobrevivem ao sono, e chamadas longas usam um keep-alive.
 5. **Seleção automática de modelo.** Modelos mudam de nome e saem do ar. Listar os que a chave tem e revezar entre eles evita fixar um nome que pode dar 404.
 6. **Dar tempo à última fala.** A fala final chega depois do Parar, então o service worker espera 1,5 s antes de fechar a transcrição.
@@ -150,7 +150,7 @@ Onde ficam os dados: o MP3 inteiro de cada gravação fica no IndexedDB (as 12 m
 - O MP3, a transcrição e o histórico ficam no navegador. Não há backend próprio.
 - Só sai da máquina o que vai à API do Gemini, e apenas se você colar uma chave: o texto da transcrição para o resumo e, no fallback, o áudio em partes.
 - As falas capturadas antes de gravar ficam só na memória da aba e somem se ela fechar.
-- Permissões e motivo: `offscreen` (captura e codificação), `downloads` e `downloads.open` (salvar e abrir arquivos), `storage` e `unlimitedStorage` (ajustes, histórico e áudios), `tabs` (reaproveitar a aba de gravações e falar com a aba da reunião), `notifications` (aviso ao salvar). Acesso aos sites do Meet e do Teams para o content script, e a `generativelanguage.googleapis.com` para o resumo. O microfone é pedido pelo navegador, numa tela visível.
+- Cada permissão tem um motivo: `offscreen` (captura e codificação), `downloads` e `downloads.open` (salvar e abrir arquivos), `storage` e `unlimitedStorage` (ajustes, histórico e áudios), `tabs` (reaproveitar a aba de gravações e falar com a aba da reunião), `notifications` (aviso ao salvar). A extensão também acessa os sites do Meet e do Teams, para o content script, e o `generativelanguage.googleapis.com`, para o resumo. O microfone é pedido pelo navegador, numa tela visível.
 
 ### Limites conhecidos
 

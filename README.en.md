@@ -22,7 +22,7 @@
 
 ### Overview
 
-Meeting Recorder is a Chrome extension (Manifest V3) that records system audio and, optionally, your microphone, and gives you a lightweight MP3 encoded on your own machine. In parallel it reads the official captions from Google Meet and Microsoft Teams and builds a transcript with the speaker's name. In the end you get `.mp3`, `.vtt` and `.txt` files, plus an optional summary from Gemini using your own key. No bot joins the room and there's no server of its own: everything stays in the browser. Current version: 1.1.0, published on the Chrome Web Store.
+Meeting Recorder is a Chrome extension (Manifest V3) that records system audio and, optionally, your microphone, and gives you a lightweight MP3 encoded on your own machine. In parallel it reads the official captions from Google Meet and Microsoft Teams and builds a transcript with the speaker's name. In the end you get `.mp3`, `.vtt` and `.txt` files, plus an optional summary from Gemini using your own key. No bot joins the room and there's no server of its own: everything stays in the browser. The current version is 1.1.0, published on the Chrome Web Store.
 
 ### How it works
 
@@ -85,10 +85,10 @@ When the room has no captions, or company policy blocks them, the recording has 
 
 #### Exports
 
-- `.mp3`: downloaded on stop, into Downloads under the configured subfolder (default `Reuniões`), or with "Save as" if you prefer. The name follows a configurable date format with a live preview.
-- `.vtt`: WebVTT blocks with `<v Name>` and times aligned to the MP3. It can download automatically or on demand.
-- `.txt`: lines like `[mm:ss] Name: text`. Speech before Record shows as `[-02:10]`.
-- `.md`: the summary, downloadable from the Recordings tab.
+- The `.mp3` is downloaded on stop, into Downloads under the configured subfolder (default `Reuniões`), or with "Save as" if you prefer. The name follows a configurable date format with a live preview.
+- The `.vtt` has WebVTT blocks with `<v Name>` and times aligned to the MP3. It can download automatically or on demand.
+- The `.txt` has lines like `[mm:ss] Name: text`. Speech before Record shows as `[-02:10]`.
+- The `.md` is the summary, which you can download from the Recordings tab.
 
 <p align="center"><img src="./assets/screens/detalhe-exportar.png" alt="Recording detail with buttons to copy and download the transcript as .txt and .vtt." width="92%"><br><sub>Recording detail with buttons to copy and download the transcript as .txt and .vtt.</sub></p>
 
@@ -115,12 +115,12 @@ The Settings and Recordings page lists recordings with a player, transcript, sum
 
 ### Architecture
 
-- `content.js`: pill, caption engine, buffer and delivery of utterances.
-- `background.js`: service worker. State, `.txt` and `.vtt` assembly, downloads, notification, automatic summary.
-- `offscreen.js`: capture, mixing and MP3 encoding.
-- `gemini.js`: models, prompts, calls with rotation, slicing.
-- `idb.js`, `format.js`, `md.js`, `i18n.js`: IndexedDB, file names, Markdown to HTML without a library, strings.
-- `popup.js` and `options.js`: controls and history.
+- `content.js` handles the pill, the caption engine, the buffer and the delivery of utterances.
+- `background.js` is the service worker. It keeps the state, builds the `.txt` and `.vtt`, runs the downloads, shows the notification and triggers the automatic summary.
+- `offscreen.js` does the capture, the mixing and the MP3 encoding.
+- `gemini.js` deals with models, prompts, calls with rotation and slicing.
+- `idb.js`, `format.js`, `md.js` and `i18n.js` handle IndexedDB, file names, Markdown to HTML without a library, and strings.
+- `popup.js` and `options.js` are the controls and the history.
 
 ```mermaid
 flowchart LR
@@ -134,13 +134,13 @@ flowchart LR
     OP --> GM
 ```
 
-Where the data lives: the whole MP3 of each recording is in IndexedDB (the 12 most recent). Metadata, transcript, VTT and summary are in `chrome.storage.local` (up to 50 records). Settings are in `chrome.storage.sync`. The Gemini key is in `chrome.storage.local`. The state of a recording in progress is in `chrome.storage.session`.
+The data lives in different places. The whole MP3 of each recording is in IndexedDB (the 12 most recent). Metadata, transcript, VTT and summary are in `chrome.storage.local` (up to 50 records). Settings are in `chrome.storage.sync`. The Gemini key is in `chrome.storage.local`. The state of a recording in progress is in `chrome.storage.session`.
 
 ### Engineering decisions
 
 1. **Encode MP3 live.** The old path recorded webm, decoded everything to PCM and encoded at the end. Past roughly 10 minutes the renderer ran out of memory and Chrome killed the offscreen document without an error, so the recording vanished. Encoding block by block keeps memory almost flat.
 2. **One file, with marked cuts.** The saved MP3 is never cut. Cut points are only byte offsets at frame boundaries, used by the fallback to slice the blob at transcription time.
-3. **Read the official caption instead of listening to audio.** It gives the real speaker name and avoids sending heavy audio to Gemini. The summary starts from plain text.
+3. **Read the official caption instead of listening to audio.** This way the extension gets the real speaker name and avoids sending heavy audio to Gemini. The summary starts from plain text.
 4. **State persisted in `storage.session`.** The MV3 service worker sleeps and loses variables. The recording in progress and the accumulated utterances survive sleep, and long calls use a keep-alive.
 5. **Automatic model selection.** Models get renamed and retired. Listing the ones the key has and rotating among them avoids pinning a name that may return 404.
 6. **Give the last utterance time.** The final utterance arrives after Stop, so the service worker waits 1.5 s before closing the transcript.
@@ -150,7 +150,7 @@ Where the data lives: the whole MP3 of each recording is in IndexedDB (the 12 mo
 - The MP3, the transcript and the history stay in the browser. There is no backend of its own.
 - The only data that leaves the machine goes to the Gemini API, and only if you paste a key: the transcript text for the summary and, in the fallback, the audio in parts.
 - Utterances captured before recording stay in the tab's memory only and vanish if it closes.
-- Permissions and why: `offscreen` (capture and encoding), `downloads` and `downloads.open` (save and open files), `storage` and `unlimitedStorage` (settings, history and audio), `tabs` (reuse the recordings tab and talk to the meeting tab), `notifications` (alert on save). Access to the Meet and Teams sites for the content script, and to `generativelanguage.googleapis.com` for the summary. The microphone is requested through the browser, on a visible screen.
+- Each permission has a reason: `offscreen` (capture and encoding), `downloads` and `downloads.open` (save and open files), `storage` and `unlimitedStorage` (settings, history and audio), `tabs` (reuse the recordings tab and talk to the meeting tab), `notifications` (alert on save). The extension also accesses the Meet and Teams sites, for the content script, and `generativelanguage.googleapis.com`, for the summary. The microphone is requested through the browser, on a visible screen.
 
 ### Known limits
 
