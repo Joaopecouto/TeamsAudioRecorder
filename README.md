@@ -22,7 +22,7 @@
 
 ### Visão geral
 
-O Gravador de Reunião é uma extensão do Chrome (Manifest V3) que grava o áudio do sistema e, se você quiser, o microfone, e entrega um MP3 leve codificado na própria máquina. Em paralelo, ela lê as legendas oficiais do Google Meet e do Microsoft Teams e monta uma transcrição com o nome de quem fala. No fim você tem `.mp3`, `.vtt` e `.txt`, mais um resumo opcional gerado pelo Gemini com a sua própria chave. Nenhum bot entra na sala e não existe servidor próprio: tudo fica no navegador. Versão atual: 1.1.0, publicada na Chrome Web Store.
+O Gravador de Reunião é uma extensão do Chrome (Manifest V3) que grava o áudio do sistema e, se você quiser, o microfone, e entrega um MP3 leve codificado na própria máquina. Em paralelo, ela lê as legendas oficiais do Google Meet e do Microsoft Teams e monta uma transcrição com o nome de quem fala. No fim você já tem `.mp3`, `.vtt` e `.txt`, mais um resumo opcional gerado pelo Gemini com a sua própria chave. Nenhum bot entra na sala e não existe nenhum servidor próprio: tudo fica no navegador. Versão atual: 1.1.0, publicada na Chrome Web Store.
 
 ### Como funciona
 

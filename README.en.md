@@ -22,7 +22,7 @@
 
 ### Overview
 
-Meeting Recorder is a Chrome extension (Manifest V3) that records system audio and, optionally, your microphone, and delivers a lightweight MP3 encoded on your own machine. In parallel it reads the official captions from Google Meet and Microsoft Teams and builds a transcript with the speaker's name. In the end you get `.mp3`, `.vtt` and `.txt` files, plus an optional summary from Gemini using your own key. No bot joins the room and there is no server of its own: everything stays in the browser. Current version: 1.1.0, published on the Chrome Web Store.
+Meeting Recorder is a Chrome extension (Manifest V3) that records system audio and, optionally, your microphone, and gives you a lightweight MP3 encoded on your own machine. In parallel it reads the official captions from Google Meet and Microsoft Teams and builds a transcript with the speaker's name. In the end you get `.mp3`, `.vtt` and `.txt` files, plus an optional summary from Gemini using your own key. No bot joins the room and there's no server of its own: everything stays in the browser. Current version: 1.1.0, published on the Chrome Web Store.
 
 ### How it works
 
