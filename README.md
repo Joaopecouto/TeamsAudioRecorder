@@ -1,4 +1,4 @@
-<p align="center"><img src="https://raw.githubusercontent.com/Joaopecouto/Joaopecouto/main/assets/projects/v2/gravador.png" width="96" alt="Ícone do projeto"></p>
+<p align="center"><img src="https://raw.githubusercontent.com/Joaopecouto/Joaopecouto/main/assets/projects/v3/gravador.png" width="96" alt="Ícone do projeto"></p>
 
 <h1 align="center">Gravador de Reunião</h1>
 
